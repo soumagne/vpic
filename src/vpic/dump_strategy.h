@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <vector>
 #include <iostream>
+#include <math.h> 
 
 //#define DUMP_INFO_DEBUG 1
 //#define H5_ASYNC 1
@@ -15,9 +16,9 @@
 //#define METADATA_COLL_WRITE 1
 //#define TRUE 1
 
-//#define HAS_FIELD_COMP 1
-//#define HAS_HYDRO_COMP 1
-//#define HAS_PARTICLE_COMP 1
+#define HAS_FIELD_COMP 1
+#define HAS_HYDRO_COMP 1
+#define HAS_PARTICLE_COMP 1
 
 //#define HAS_INDEPENDENT_IO 1
 
@@ -40,6 +41,9 @@
 #include "hdf5_header_info.h" // from vpic
 //#define daos "daos:"
 #define daos ""
+
+#define USE_ASYNC 1
+
 #endif
 
 #ifdef VPIC_ENABLE_OPENPMD
@@ -59,15 +63,71 @@
     }                                                  \
   } while(0)
 
+extern hid_t es_field;
+#if HAS_FIELD_COMP
+extern field_t* temp_field;
+#else
+extern float* temp_field;
+#endif
+extern hid_t es_hydro;
+#if HAS_HYDRO_COMP
+extern hydro_t* temp_hydro;
+#else
+extern float* temp_hydro;
+#endif
+extern hid_t es_particle;
+//extern float* temp_particle;
+extern hbool_t es_err;
 
+#if 0 //def USE_ASYNC
+class async_data{
+    public:
+    uint64_t timeout = pow(10,9); /* nano-seconds */
+    hid_t es_field = 0;
+    hid_t es_hydro = 0;
+    hid_t es_particle=  0;
+    H5ES_status_t es_status;
+    size_t es_cnt;
+    float** temp_field = NULL;
+    float** temp_particle = NULL;
+    int** itemp_particle = NULL;
+    float** temp_hydro = NULL;
+    void getit(hid_t *_es_field) {
+      *_es_field=es_field;
+    }
+};      
+#endif
 // Runtime inheritance is obviously not very "VPIC like", as we will [probably]
 // incur a penalty for the vtable lookup, but given we're about to do IO this
 // is very negligible.
-class Dump_Strategy {
+class Dump_Strategy
+#if 0 //def USE_ASYNC
+ : public async_data
+#endif
+ {
     public:
     int rank, nproc, num_step;
+    //class async_data;  
+#ifdef USE_ASYNC
+    uint64_t timeout = pow(10,9); /* nano-seconds */
+//    hid_t es_field = 0;
+//    hid_t es_hydro = 0;
+//    hid_t es_particle=  0;
+    H5ES_status_t es_status;
+    size_t es_cnt;
+//    float** temp_field = NULL;
+//    float** temp_particle = NULL;
+//    int** itemp_particle = NULL;
+//    float** temp_hydro = NULL;
+#endif
+#if 0
+    void getit(hid_t *_es_field) {
+      *_es_field=es_field;
+    }
+#endif
+    //using async_data::getit;
 
-    Dump_Strategy(int _rank, int _nproc ) :
+    Dump_Strategy(int _rank, int _nproc) :
         rank(_rank),
         nproc(_nproc)
     { } // empty
@@ -292,6 +352,9 @@ class HDF5Dump : public Dump_Strategy {
             int ftag
         )
         {
+#if USE_ASYNC
+            H5ESwait(es_particle, 0, &es_cnt, &es_err);
+#endif
             size_t step_for_viou = step;
             int file_exist_flag = 0;
 
@@ -326,6 +389,28 @@ class HDF5Dump : public Dump_Strategy {
 //    return (stat(filename, &buffer) == 0);
 //}
 
+#ifdef USE_ASYNC
+            if( es_field > 0) {
+              /* check if all operations in event set have completed */
+              H5ESwait(es_field, 0, &es_cnt, &es_err); 
+              if(es_cnt != 0) {
+                H5ESwait(es_field, H5ES_WAIT_FOREVER, &es_cnt, &es_err);
+                if(es_cnt != 0 | es_err != 0) {
+                  ERROR(("Failed to complete field async I/O \n"));
+                }
+              } else {
+                free(temp_field);
+              }
+            } else {
+              es_field = H5EScreate();
+            }
+            //printf("es_field %ld \n",es_field);
+            //hid_t tmp;
+            //async_data obj;
+            //obj.es_field = es_field;
+            //obj.getit(&tmp);
+            //printf("22es_field %ld \n", tmp); 
+#endif
             struct stat buffer;
             if((stat(fname, &buffer) == 0)){
                 file_exist_flag  = 1;
@@ -348,18 +433,34 @@ class HDF5Dump : public Dump_Strategy {
                 if(!mpi_rank) printf("Enable collective metadata write !\n");
                 H5Pset_coll_metadata_write(plist_id, TRUE);
                 #endif
+#ifdef USE_ASYNC
+                file_id = H5Fcreate_async(fname, H5F_ACC_TRUNC, H5P_DEFAULT, plist_id, es_field);
+#else
                 file_id = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, plist_id);
+#endif
                 H5Pclose(plist_id);
             }else{
+#ifdef USE_ASYNC
+                file_id = H5Fopen_async(fname, H5F_ACC_RDWR, H5P_DEFAULT, es_field);
+#else
                 file_id = H5Fopen(fname, H5F_ACC_RDWR, H5P_DEFAULT);
+#endif
             }
 
             sprintf(fname, "Timestep_%zu", step_for_viou);
             hid_t group_id;
             if(!file_exist_flag){
+#ifdef USE_ASYNC
+                group_id = H5Gcreate_async(file_id, fname, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT, es_field);
+#else
                 group_id = H5Gcreate(file_id, fname, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+#endif
             }else{
+#ifdef USE_ASYNC
+                group_id = H5Gopen_async(file_id, fname,  H5P_DEFAULT, es_field);
+#else
                 group_id = H5Gopen(file_id, fname,  H5P_DEFAULT);
+#endif
             }
             el1 = uptime() - el1;
             io_log("TimeHDF5Open): " << el1 << " s"); //Easy to handle results for scripts
@@ -519,14 +620,28 @@ class HDF5Dump : public Dump_Strategy {
             H5Tinsert(field_comp_type_it, "cmat", HOFFSET(field_t, cmat), H5T_NATIVE_SHORT);
 
             if(!file_exist_flag){
-              dset_id = H5Dcreate(group_id, "FIELD_DATA_COMP_T", field_comp_type_it, filespace, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
+#ifdef USE_ASYNC
+              dset_id = H5Dcreate_async(group_id, "FIELD_DATA_COMP_T", field_comp_type_it, filespace, 
+                                        H5P_DEFAULT, dcpl_id, H5P_DEFAULT, es_field);
+#else
+              dset_id = H5Dcreate(group_id, "FIELD_DATA_COMP_T", field_comp_type_it, filespace, 
+                                  H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
+#endif
             }else{
+#ifdef USE_ASYNC
+              dset_id = H5Dopen_async(group_id, "FIELD_DATA_COMP_T", H5P_DEFAULT, es_field);
+#else
               dset_id = H5Dopen(group_id, "FIELD_DATA_COMP_T", H5P_DEFAULT);
+#endif
             }
+#ifdef USE_ASYNC
+            dataspace_id = H5Dget_space_async(dset_id, es_field);
+#else
             dataspace_id = H5Dget_space(dset_id);
+#endif
             H5Sselect_hyperslab(dataspace_id, H5S_SELECT_SET, global_offset, NULL, global_count, NULL);
 
-            field_t *temp_buf = (field_t *)malloc(sizeof(field_t) * (grid->nx) * (grid->ny) * (grid->nz));
+            field_t *temp_field = (field_t *)malloc(sizeof(field_t) * (grid->nx) * (grid->ny) * (grid->nz));
             temp_buf_index = 0;
             for (size_t i(1); i < grid->nx + 1; i++)
               {
@@ -534,42 +649,79 @@ class HDF5Dump : public Dump_Strategy {
                   {
                     for (size_t k(1); k < grid->nz + 1; k++)
                       {
-                        temp_buf[temp_buf_index].ex = FIELD_ARRAY_NAME->fpp(i, j, k).ex;
-                        temp_buf[temp_buf_index].ey = FIELD_ARRAY_NAME->fpp(i, j, k).ey;
-                        temp_buf[temp_buf_index].ez = FIELD_ARRAY_NAME->fpp(i, j, k).ez;
-                        temp_buf[temp_buf_index].div_e_err = FIELD_ARRAY_NAME->fpp(i, j, k).div_e_err;
-                        temp_buf[temp_buf_index].cbx = FIELD_ARRAY_NAME->fpp(i, j, k).cbx;
-                        temp_buf[temp_buf_index].cby = FIELD_ARRAY_NAME->fpp(i, j, k).cby;
-                        temp_buf[temp_buf_index].cbz = FIELD_ARRAY_NAME->fpp(i, j, k).cbz;
-                        temp_buf[temp_buf_index].div_b_err = FIELD_ARRAY_NAME->fpp(i, j, k).div_b_err;
-                        temp_buf[temp_buf_index].tcax = FIELD_ARRAY_NAME->fpp(i, j, k).tcax;
-                        temp_buf[temp_buf_index].tcay = FIELD_ARRAY_NAME->fpp(i, j, k).tcay;
-                        temp_buf[temp_buf_index].tcaz = FIELD_ARRAY_NAME->fpp(i, j, k).tcaz;
-                        temp_buf[temp_buf_index].rhob = FIELD_ARRAY_NAME->fpp(i, j, k).rhob;
-                        temp_buf[temp_buf_index].jfx = FIELD_ARRAY_NAME->fpp(i, j, k).jfx;
-                        temp_buf[temp_buf_index].jfy = FIELD_ARRAY_NAME->fpp(i, j, k).jfy;
-                        temp_buf[temp_buf_index].jfz = FIELD_ARRAY_NAME->fpp(i, j, k).jfz;
-                        temp_buf[temp_buf_index].rhof = FIELD_ARRAY_NAME->fpp(i, j, k).rhof;
-                        temp_buf[temp_buf_index].ematx = FIELD_ARRAY_NAME->fpp(i, j, k).ematx;
-                        temp_buf[temp_buf_index].ematy = FIELD_ARRAY_NAME->fpp(i, j, k).ematy;
-                        temp_buf[temp_buf_index].ematz = FIELD_ARRAY_NAME->fpp(i, j, k).ematz;
-                        temp_buf[temp_buf_index].nmat = FIELD_ARRAY_NAME->fpp(i, j, k).nmat;
-                        temp_buf[temp_buf_index].fmatx = FIELD_ARRAY_NAME->fpp(i, j, k).fmatx;
-                        temp_buf[temp_buf_index].fmaty = FIELD_ARRAY_NAME->fpp(i, j, k).fmaty;
-                        temp_buf[temp_buf_index].fmatz = FIELD_ARRAY_NAME->fpp(i, j, k).fmatz;
-                        temp_buf[temp_buf_index].cmat = FIELD_ARRAY_NAME->fpp(i, j, k).cmat;
+                        temp_field[temp_buf_index].ex = FIELD_ARRAY_NAME->fpp(i, j, k).ex;
+                        temp_field[temp_buf_index].ey = FIELD_ARRAY_NAME->fpp(i, j, k).ey;
+                        temp_field[temp_buf_index].ez = FIELD_ARRAY_NAME->fpp(i, j, k).ez;
+                        temp_field[temp_buf_index].div_e_err = FIELD_ARRAY_NAME->fpp(i, j, k).div_e_err;
+                        temp_field[temp_buf_index].cbx = FIELD_ARRAY_NAME->fpp(i, j, k).cbx;
+                        temp_field[temp_buf_index].cby = FIELD_ARRAY_NAME->fpp(i, j, k).cby;
+                        temp_field[temp_buf_index].cbz = FIELD_ARRAY_NAME->fpp(i, j, k).cbz;
+                        temp_field[temp_buf_index].div_b_err = FIELD_ARRAY_NAME->fpp(i, j, k).div_b_err;
+                        temp_field[temp_buf_index].tcax = FIELD_ARRAY_NAME->fpp(i, j, k).tcax;
+                        temp_field[temp_buf_index].tcay = FIELD_ARRAY_NAME->fpp(i, j, k).tcay;
+                        temp_field[temp_buf_index].tcaz = FIELD_ARRAY_NAME->fpp(i, j, k).tcaz;
+                        temp_field[temp_buf_index].rhob = FIELD_ARRAY_NAME->fpp(i, j, k).rhob;
+                        temp_field[temp_buf_index].jfx = FIELD_ARRAY_NAME->fpp(i, j, k).jfx;
+                        temp_field[temp_buf_index].jfy = FIELD_ARRAY_NAME->fpp(i, j, k).jfy;
+                        temp_field[temp_buf_index].jfz = FIELD_ARRAY_NAME->fpp(i, j, k).jfz;
+                        temp_field[temp_buf_index].rhof = FIELD_ARRAY_NAME->fpp(i, j, k).rhof;
+                        temp_field[temp_buf_index].ematx = FIELD_ARRAY_NAME->fpp(i, j, k).ematx;
+                        temp_field[temp_buf_index].ematy = FIELD_ARRAY_NAME->fpp(i, j, k).ematy;
+                        temp_field[temp_buf_index].ematz = FIELD_ARRAY_NAME->fpp(i, j, k).ematz;
+                        temp_field[temp_buf_index].nmat = FIELD_ARRAY_NAME->fpp(i, j, k).nmat;
+                        temp_field[temp_buf_index].fmatx = FIELD_ARRAY_NAME->fpp(i, j, k).fmatx;
+                        temp_field[temp_buf_index].fmaty = FIELD_ARRAY_NAME->fpp(i, j, k).fmaty;
+                        temp_field[temp_buf_index].fmatz = FIELD_ARRAY_NAME->fpp(i, j, k).fmatz;
+                        temp_field[temp_buf_index].cmat = FIELD_ARRAY_NAME->fpp(i, j, k).cmat;
                         temp_buf_index = temp_buf_index + 1;
                       }
                   }
               }
 
-            H5Dwrite(dset_id, field_comp_type_it, memspace, dataspace_id, plist_id, temp_buf);
+#ifdef USE_ASYNC
+            H5Dwrite_async(dset_id, field_comp_type_it, memspace, dataspace_id, plist_id, temp_field, es_field);
+            // free(temp_field);
+#else
+            H5Dwrite(dset_id, field_comp_type_it, memspace, dataspace_id, plist_id, temp_field);
+            free(temp_field);
+#endif
             H5Sclose(dataspace_id);
+#ifdef USE_ASYNC
+            H5Dclose_async(dset_id, es_field);
+#else
             H5Dclose(dset_id);
+#endif
             H5Tclose(field_comp_type_it);
-            free(temp_buf);
 #else
 
+#ifdef USE_ASYNC
+#define DUMP_FIELD_TO_HDF5(DSET_NAME, ATTRIBUTE_NAME, ELEMENT_TYPE)     \
+            {                                                           \
+              if(!file_exist_flag){                                     \
+                dset_id = H5Dcreate_async(group_id, DSET_NAME, ELEMENT_TYPE, filespace, H5P_DEFAULT, dcpl_id, H5P_DEFAULT, es_field); \
+              }else{                                                    \
+                dset_id = H5Dopen_async(group_id, DSET_NAME, H5P_DEFAULT, es_field);    \
+                dataspace_id = H5Dget_space(dset_id);                   \
+              }                                                         \
+              temp_buf_index = 0;                                       \
+              for (size_t i(1); i < grid->nx + 1; i++)                  \
+                {                                                       \
+                  for (size_t j(1); j < grid->ny + 1; j++)              \
+                    {                                                   \
+                      for (size_t k(1); k < grid->nz + 1; k++)          \
+                        {                                               \
+                          temp_buf[temp_buf_index] = FIELD_ARRAY_NAME->fpp(i, j, k).ATTRIBUTE_NAME; \
+                          temp_buf_index = temp_buf_index + 1;          \
+        }                                                               \
+                    }                                                   \
+                }                                                       \
+              dataspace_id = H5Dget_space(dset_id);                     \
+              H5Sselect_hyperslab(dataspace_id, H5S_SELECT_SET, global_offset, NULL, global_count, NULL); \
+              H5Dwrite_async(dset_id, ELEMENT_TYPE, memspace, dataspace_id, plist_id, temp_buf, es_field); \
+              H5Sclose(dataspace_id);                                   \
+              H5Dclose_async(dset_id, es_field);                           \
+        }
+#else
 #define DUMP_FIELD_TO_HDF5(DSET_NAME, ATTRIBUTE_NAME, ELEMENT_TYPE)     \
             {                                                           \
               if(!file_exist_flag){                                     \
@@ -596,7 +748,7 @@ class HDF5Dump : public Dump_Strategy {
               H5Sclose(dataspace_id);                                   \
               H5Dclose(dset_id);                                        \
         }
-
+#endif
             float *temp_buf = (float *)malloc(sizeof(float) * (grid->nx) * (grid->ny) * (grid->nz));
 
             if (field_dump_flag.ex)
@@ -653,10 +805,11 @@ class HDF5Dump : public Dump_Strategy {
               DUMP_FIELD_TO_HDF5("fmatz", fmatz, H5T_NATIVE_SHORT);
             if (field_dump_flag.cmat)
               DUMP_FIELD_TO_HDF5("cmat", cmat, H5T_NATIVE_SHORT);
-
+#ifndef USE_ASYNC
             free(temp_buf);
 #endif
 
+#endif
             H5D_mpio_actual_io_mode_t actual_io_mode;
             H5Pget_mpio_actual_io_mode(plist_id,  &actual_io_mode);
             switch(actual_io_mode){
@@ -787,9 +940,13 @@ class HDF5Dump : public Dump_Strategy {
                 H5Sclose(filespace);
             H5Sclose(memspace);
             H5Pclose(plist_id);
+#ifdef USE_ASYNC
+            H5Gclose_async(group_id, es_field);
+            H5Fclose_async(file_id, es_field);
+#else
             H5Gclose(group_id);
             H5Fclose(file_id);
-
+#endif
             el3 = uptime() - el3;
             io_log("TimeHDF5Close: " << el3 << " s");
 
@@ -857,6 +1014,25 @@ class HDF5Dump : public Dump_Strategy {
                 }
                 field_tframe++;
             }
+#ifdef USE_ASYNC
+            /* check if field I/O has completed before leaving I/O */
+            H5ESwait(es_field, 0, &es_cnt, &es_err);
+            if(es_cnt = 0) {
+              printf("es_field has completed \n");
+              free(temp_field);
+            }
+           if( es_particle > 0) {
+              /* check if all operations in event set have completed */
+              H5ESwait(es_particle, 0, &es_cnt, &es_err);
+              if(es_cnt != 0) {
+                H5ESwait(es_particle, H5ES_WAIT_FOREVER, &es_cnt, &es_err);
+                if(es_cnt != 0 | es_err != 0) {
+                  ERROR(("Failed to complete particle async I/O \n"));
+                }
+              }
+            }
+
+#endif
         }
         void dump_particles(
             const char *fbase,
@@ -874,7 +1050,6 @@ class HDF5Dump : public Dump_Strategy {
             double dump_particles_uptime = uptime();
             time_t seconds = time(NULL);
            // printf("Atrank = %d, file_index = %d, dump_particles_uptime = %f, epoch_seconds = %ld  \n ", mpi_rank, file_index, dump_particles_uptime, seconds);
-
 
             size_t step_for_viou = step;
             char fname[256];
@@ -958,7 +1133,6 @@ class HDF5Dump : public Dump_Strategy {
                 offset = 0;
             #endif
 
-
             hid_t file_plist_id = H5Pcreate(H5P_FILE_ACCESS);
 
             #ifndef N_FILE_N_PROCESS
@@ -975,13 +1149,40 @@ class HDF5Dump : public Dump_Strategy {
                 if(!mpi_rank) printf("Enable collective metadata write !\n");
                 H5Pset_coll_metadata_write(file_plist_id, TRUE);
             #endif
+#ifdef USE_ASYNC
+#if 0
+            if( es_particle > 0) {
+              /* check if all operations in event set have completed */
+              H5ESget_count(es_particle, &es_cnt);
+              if(es_cnt != 0) {
+                H5ESwait(es_particle, timeout, &es_cnt, &es_err);
+                if(es_cnt != 0 | es_err != 0) {
+                  ERROR(("Failed to complete particle async I/O \n"));
+                }
+              } //else {
+                //free(temp_particle);
+              //}
+            } else {
+#endif
+            if( es_particle <= 0) {
+              es_particle = H5EScreate();
+            }
+//            H5ESwait(es_particle, 0, &es_cnt, &es_err);
 
+#endif
+#ifdef USE_ASYNC
+            hid_t file_id = H5Fcreate_async(fname, H5F_ACC_TRUNC, H5P_DEFAULT, file_plist_id, es_particle);
+#else
             hid_t file_id = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, file_plist_id);
+#endif
             //if(!mpi_rank )
             //    io_log("++Particle H5Fcreate) ");
 
-
+#ifdef USE_ASYNC
+            hid_t group_id = H5Gcreate_async(file_id, group_name, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT, es_particle);
+#else
             hid_t group_id = H5Gcreate(file_id, group_name, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+#endif
             //if(!mpi_rank )
             //    io_log("++Particle H5Gcreate) ");
 
@@ -1044,11 +1245,19 @@ class HDF5Dump : public Dump_Strategy {
             double el2 = uptime();
  int ierr;
 
+#ifdef USE_ASYNC
+#define WRITE_H5_FILE(group_id_p, data_buf_p, type_p, dname_p){\
+   hid_t dset_id = H5Dcreate_async(group_id_p, dname_p, type_p, filespace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT, es_particle); \
+   H5Dwrite_async(dset_id, type_p, memspace, filespace, io_plist_id, data_buf_p, es_particle); \
+   H5Dclose_async(dset_id, es_particle); \
+}
+#else
 #define WRITE_H5_FILE(group_id_p, data_buf_p, type_p, dname_p){\
    hid_t dset_id = H5Dcreate(group_id_p, dname_p, type_p, filespace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT); \
    H5Dwrite(dset_id, type_p, memspace, filespace, io_plist_id, data_buf_p);\
    H5Dclose(dset_id);\
 }
+#endif
 
 
 //MPI_Info_set(info, "romio_cb_write", "disable");
@@ -1066,9 +1275,16 @@ class HDF5Dump : public Dump_Strategy {
 }
 
 #ifdef HAS_PARTICLE_COMP
+#if USE_ASYNC
+    hid_t dset_id = H5Dcreate_async(group_id, "ParticleComp", particle_comp_type_it, filespace, 
+                                    H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT, es_particle);
+    H5Dwrite_async(dset_id, particle_comp_type_it, memspace, filespace, io_plist_id, sp->p, es_particle);
+    H5Dclose_async(dset_id, es_particle);
+#else
     hid_t dset_id = H5Dcreate(group_id, "ParticleComp", particle_comp_type_it, filespace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     H5Dwrite(dset_id, particle_comp_type_it, memspace, filespace, io_plist_id, sp->p);
     H5Dclose(dset_id);
+#endif
 #else
 #ifdef TEST_MPIIO
             //Here we don't use the stripe but just for performance test
@@ -1106,12 +1322,14 @@ class HDF5Dump : public Dump_Strategy {
             H5Sclose(memspace);
             H5Sclose(filespace);
             H5Pclose(file_plist_id);
-	        H5Pclose(io_plist_id);
+            H5Pclose(io_plist_id);
+#if USE_ASYNC
+            H5Gclose_async(group_id, es_particle);
+            H5Fclose_async(file_id, es_particle);
+#else
             H5Gclose(group_id);
-
-
-
             H5Fclose(file_id);
+#endif
 
             #ifdef H5_ASYNC
             H5VLasync_finalize();
@@ -1119,6 +1337,14 @@ class HDF5Dump : public Dump_Strategy {
             el3 = uptime() - el3;
             io_log("Particle TimeHDF5Close: " << el3 << " s");
 
+#ifdef USE_ASYNC
+            /* check if field I/O has completed before leaving I/O */
+            H5ESwait(es_particle, 0, &es_cnt, &es_err);
+            if(es_cnt = 0) {
+              printf("es_particle has completed \n");
+              //   free(temp_particle);
+            }
+#endif
         }
 
         void dump_hydro(
@@ -1132,6 +1358,10 @@ class HDF5Dump : public Dump_Strategy {
         )
         {
             size_t step_for_viou = step;
+
+#if USE_ASYNC
+            H5ESwait(es_particle, 0, &es_cnt, &es_err);
+#endif
 
             //#define DUMP_INFO_DEBUG 1
             int mpi_size, mpi_rank;
@@ -1172,11 +1402,39 @@ class HDF5Dump : public Dump_Strategy {
                 if(!mpi_rank) printf("Enable collective metadata write !\n");
                 H5Pset_coll_metadata_write(plist_id, TRUE);
             #endif
+
+#ifdef USE_ASYNC
+#if 0
+            if( es_hydro > 0) {
+              /* check if all operations in event set have completed */
+              H5ESget_count(es_hydro, &es_cnt);
+              if(es_cnt != 0) {
+                H5ESwait(es_hydro, timeout, &es_cnt, &es_err);
+                if(es_cnt != 0 | es_err != 0) {
+                  ERROR(("Failed to complete hydro async I/O \n"));
+                }
+              } else {
+                free(temp_hydro);
+              }
+            } else {
+#endif
+            if( es_hydro <= 0) {
+              es_hydro = H5EScreate();
+            }
+#endif
+#ifdef USE_ASYNC
+            hid_t file_id = H5Fcreate_async(hname, H5F_ACC_TRUNC, H5P_DEFAULT, plist_id, es_hydro);
+#else
             hid_t file_id = H5Fcreate(hname, H5F_ACC_TRUNC, H5P_DEFAULT, plist_id);
+#endif
             H5Pclose(plist_id);
 
             sprintf(hname, "Timestep_%zu", step_for_viou);
+#ifdef USE_ASYNC
+            hid_t group_id = H5Gcreate_async(file_id, hname, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT, es_hydro);
+#else
             hid_t group_id = H5Gcreate(file_id, hname, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+#endif
 
             el1 = uptime() - el1;
             io_log("TimeHDF5Open: " << el1 << " s"); //Easy to handle results for scripts
@@ -1262,7 +1520,7 @@ class HDF5Dump : public Dump_Strategy {
             if(!mpi_rank)
               printf("Using Hydro Compund type !\n");
 
-            hid_t  hydro_comp_type_it = H5Tcreate (H5T_COMPOUND, sizeof(hydro_t));
+            hid_t hydro_comp_type_it = H5Tcreate (H5T_COMPOUND, sizeof(hydro_t));
 
             H5Tinsert(hydro_comp_type_it,"jx", HOFFSET(hydro_t, jx), H5T_NATIVE_FLOAT);
             H5Tinsert(hydro_comp_type_it,"jy", HOFFSET(hydro_t, jy), H5T_NATIVE_FLOAT);
@@ -1283,13 +1541,21 @@ class HDF5Dump : public Dump_Strategy {
             H5Tinsert(hydro_comp_type_it,"txy", HOFFSET(hydro_t, txy), H5T_NATIVE_FLOAT);
 
             //   if(!file_exist_flag){
+#ifdef USE_ASYNC
+            dset_id = H5Dcreate_async(group_id, "HYDRO_DATA_COMP_T", hydro_comp_type_it, filespace, 
+                                      H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT, es_hydro);  // dcpd_id MSB
+#else
             dset_id = H5Dcreate(group_id, "HYDRO_DATA_COMP_T", hydro_comp_type_it, filespace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);  // dcpd_id MSB
+#endif
               //    }else{
               //   dset_id = H5Dopen(group_id, "HYDRO_DATA_COMP_T", H5P_DEFAULT);
               //  }
+#ifdef USE_ASYNC
+            dataspace_id = H5Dget_space_async(dset_id, es_hydro);
+#else
             dataspace_id = H5Dget_space(dset_id);
-
-            hydro_t *temp_buf = (hydro_t *)malloc(sizeof(hydro_t) * (grid->nx) * (grid->ny) * (grid->nz));
+#endif
+            hydro_t *temp_hydro = (hydro_t *)malloc(sizeof(hydro_t) * (grid->nx) * (grid->ny) * (grid->nz));
             temp_buf_index = 0;
             for (size_t i(1); i < grid->nx + 1; i++)
                 {
@@ -1297,31 +1563,39 @@ class HDF5Dump : public Dump_Strategy {
                     {
                         for (size_t k(1); k < grid->nz + 1; k++)
                         {
-                            temp_buf[temp_buf_index].jx = _hydro(i, j, k).jx;
-                            temp_buf[temp_buf_index].jy = _hydro(i, j, k).jy;
-                            temp_buf[temp_buf_index].jz = _hydro(i, j, k).jz;
-                            temp_buf[temp_buf_index].rho = _hydro(i, j, k).rho;
-                            temp_buf[temp_buf_index].px = _hydro(i, j, k).px;
-                            temp_buf[temp_buf_index].py = _hydro(i, j, k).py;
-                            temp_buf[temp_buf_index].pz = _hydro(i, j, k).pz;
-                            temp_buf[temp_buf_index].ke = _hydro(i, j, k).ke;
-                            temp_buf[temp_buf_index].txx = _hydro(i, j, k).txx;
-                            temp_buf[temp_buf_index].tyy = _hydro(i, j, k).tyy;
-                            temp_buf[temp_buf_index].tzz = _hydro(i, j, k).tzz;
-                            temp_buf[temp_buf_index].tyz = _hydro(i, j, k).tyz;
-                            temp_buf[temp_buf_index].tzx = _hydro(i, j, k).tzx;
-                            temp_buf[temp_buf_index].txy = _hydro(i, j, k).txy;
+                            temp_hydro[temp_buf_index].jx = _hydro(i, j, k).jx;
+                            temp_hydro[temp_buf_index].jy = _hydro(i, j, k).jy;
+                            temp_hydro[temp_buf_index].jz = _hydro(i, j, k).jz;
+                            temp_hydro[temp_buf_index].rho = _hydro(i, j, k).rho;
+                            temp_hydro[temp_buf_index].px = _hydro(i, j, k).px;
+                            temp_hydro[temp_buf_index].py = _hydro(i, j, k).py;
+                            temp_hydro[temp_buf_index].pz = _hydro(i, j, k).pz;
+                            temp_hydro[temp_buf_index].ke = _hydro(i, j, k).ke;
+                            temp_hydro[temp_buf_index].txx = _hydro(i, j, k).txx;
+                            temp_hydro[temp_buf_index].tyy = _hydro(i, j, k).tyy;
+                            temp_hydro[temp_buf_index].tzz = _hydro(i, j, k).tzz;
+                            temp_hydro[temp_buf_index].tyz = _hydro(i, j, k).tyz;
+                            temp_hydro[temp_buf_index].tzx = _hydro(i, j, k).tzx;
+                            temp_hydro[temp_buf_index].txy = _hydro(i, j, k).txy;
                             temp_buf_index = temp_buf_index + 1;
                         }
                     }
                 }
             H5Sselect_hyperslab(dataspace_id, H5S_SELECT_SET, global_offset, NULL, global_count, NULL);
-            H5Dwrite(dset_id, hydro_comp_type_it, memspace, dataspace_id, plist_id,  temp_buf);
+#ifdef USE_ASYNC
+            H5Dwrite_async(dset_id, hydro_comp_type_it, memspace, dataspace_id, plist_id, temp_hydro, es_hydro);
+#else
+            H5Dwrite(dset_id, hydro_comp_type_it, memspace, dataspace_id, plist_id, temp_hydro);
+#endif
             H5Sclose(dataspace_id);
+#ifdef USE_ASYNC
+            H5Dclose_async(dset_id, es_hydro);
+#else
             H5Dclose(dset_id);
+#endif
             H5Tclose(hydro_comp_type_it);
 #else
-            float *temp_buf = (float *)malloc(sizeof(float) * (grid->nx) * (grid->ny) * (grid->nz));
+            float *temp_hydro = (float *)malloc(sizeof(float) * (grid->nx) * (grid->ny) * (grid->nz));
 
 #define DUMP_HYDRO_TO_HDF5(DSET_NAME, ATTRIBUTE_NAME, ELEMENT_TYPE)                                               \
             {                                                                                                             \
@@ -1333,14 +1607,14 @@ class HDF5Dump : public Dump_Strategy {
                     {                                                                                                     \
                         for (size_t k(1); k < grid->nz + 1; k++)                                                          \
                         {                                                                                                 \
-                            temp_buf[temp_buf_index] = _hydro(i, j, k).ATTRIBUTE_NAME;                                     \
+                            temp_hydro[temp_buf_index] = _hydro(i, j, k).ATTRIBUTE_NAME;                                  \
                             temp_buf_index = temp_buf_index + 1;                                                          \
                         }                                                                                                 \
                     }                                                                                                     \
                 }                                                                                                         \
                 dataspace_id = H5Dget_space(dset_id);                                                                     \
                 H5Sselect_hyperslab(dataspace_id, H5S_SELECT_SET, global_offset, NULL, global_count, NULL);               \
-                H5Dwrite(dset_id, ELEMENT_TYPE, memspace, dataspace_id, plist_id, temp_buf);                              \
+                H5Dwrite(dset_id, ELEMENT_TYPE, memspace, dataspace_id, plist_id, temp_hydro);                            \
                 H5Sclose(dataspace_id);                                                                                   \
                 H5Dclose(dset_id);                                                                                        \
             }
@@ -1400,13 +1674,19 @@ class HDF5Dump : public Dump_Strategy {
             H5Awrite(va_geo_attribute_id, H5T_NATIVE_FLOAT, attr_data);
             H5Sclose(va_geo_dataspace_id);
             H5Aclose(va_geo_attribute_id);*/
-
-            free(temp_buf);
+#ifndef USE_ASYNC
+            free(temp_hydro);
+#endif
             H5Sclose(filespace);
             H5Sclose(memspace);
             H5Pclose(plist_id);
+#ifdef USE_ASYNC
+            H5Gclose_async(group_id, es_hydro);
+            H5Fclose_async(file_id, es_hydro);
+#else
             H5Gclose(group_id);
             H5Fclose(file_id);
+#endif
 
             el3 = uptime() - el3;
             io_log("TimeHDF5Close: " << el3 << " s");
@@ -1473,6 +1753,15 @@ class HDF5Dump : public Dump_Strategy {
                 }
                 tframe_map[sp->id]++;
             }
+#ifdef USE_ASYNC
+            H5ESwait(es_particle, 0, &es_cnt, &es_err);
+            /* check if field I/O has completed before leaving I/O */
+            H5ESwait(es_hydro, 0, &es_cnt, &es_err);
+            if(es_cnt = 0) {
+              printf("es_hydro has completed \n");
+              free(temp_hydro);
+            }
+#endif
         }
 };
 #endif

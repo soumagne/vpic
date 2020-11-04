@@ -10,6 +10,23 @@
 
 #include "vpic.h"
 
+extern hid_t es_field;
+extern hid_t es_hydro;
+extern hid_t es_particle;
+extern hbool_t es_err;
+#if HAS_FIELD_COMP
+extern field_t* temp_field;
+#else
+extern float* temp_field;
+#endif
+#if HAS_HYDRO_COMP
+extern hydro_t* temp_hydro;
+#else
+extern float* temp_hydro;
+#endif
+extern float* temp_particle;
+extern int* itemp_particle;
+
 #define FAK field_array->kernel
 
 int vpic_simulation::advance(void) {
@@ -18,7 +35,37 @@ int vpic_simulation::advance(void) {
 
   // Determine if we are done ... see note below why this is done here
 
-  if( num_step>0 && step()>=num_step ) return 0;
+  if( num_step>0 && step()>=num_step ) {
+    #ifdef USE_ASYNC
+     size_t cnt;
+     H5ESwait(es_field, 0, &cnt, &es_err);
+     if(cnt == 0) {
+       // printf("ES COUNT IS ZERO, FREEING MEMORY\n");
+       if(temp_field) free(temp_field);
+     }
+     H5ESwait(es_hydro, 0, &cnt, &es_err);
+     if(cnt == 0) {
+       // printf("ES COUNT IS ZERO, FREEING MEMORY\n");
+       if(temp_hydro) free(temp_hydro);
+     }
+#endif
+    return 0;
+  }
+
+#ifdef USE_ASYNC
+  /* check if all operations in event set have completed */
+     size_t cnt;
+     H5ESwait(es_field, 0, &cnt, &es_err);
+     if(cnt == 0) {
+       // printf("ES COUNT IS ZERO, FREEING MEMORY\n");
+       if(temp_field) free(temp_field);
+     }
+     H5ESwait(es_hydro, 0, &cnt, &es_err);
+     if(cnt == 0) {
+       // printf("ES COUNT IS ZERO, FREEING MEMORY\n");
+       if(temp_hydro) free(temp_hydro);
+     }
+#endif
 
   // Sort the particles for performance if desired.
 
@@ -191,6 +238,22 @@ int vpic_simulation::advance(void) {
   if( (status_interval>0) && ((step() % status_interval)==0) ) {
     if( rank()==0 ) MESSAGE(( "Completed step %i of %i", step(), num_step ));
     update_profile( rank()==0 );
+#ifdef USE_ASYNC
+  /* check if all operations in event set have completed */
+     size_t cnt;
+     H5ESwait(es_field, 0, &cnt, &es_err);
+     if(cnt != 0) {
+       H5ESwait(es_field, H5ES_WAIT_FOREVER, &cnt, &es_err);
+       // printf("ES COUNT IS ZERO, FREEING MEMORY\n");
+       if(temp_field) free(temp_field);
+     }
+     H5ESwait(es_hydro, 0, &cnt, &es_err);
+     if(cnt != 0) {
+       H5ESwait(es_hydro, H5ES_WAIT_FOREVER, &cnt, &es_err);
+       // printf("ES COUNT IS ZERO, FREEING MEMORY\n");
+       if(temp_hydro) free(temp_hydro);
+     }
+#endif
   }
 
   // Let the user compute diagnostics
