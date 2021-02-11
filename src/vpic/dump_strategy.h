@@ -1343,7 +1343,7 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
                              H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT, es_hydro);
     H5Sselect_hyperslab(filespace, H5S_SELECT_SET, global_offset, NULL,
                         global_count, NULL);
-    H5Dwrite_async(dset_id, hydro_type_id, memspace, filespace, plist_id,
+    H5Dwrite_wrap(dset_id, hydro_type_id, memspace, filespace, plist_id,
                    hydro_buf, es_hydro);
     H5Dclose_wrap(dset_id, es_hydro);
 #    else
