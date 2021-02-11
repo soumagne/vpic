@@ -140,17 +140,17 @@ begin_initialization {
   // Setup high level simulation parmeters
 
   num_step             = int(0.2*taui/(wci*dt));
-  status_interval      = int(1./(wci*dt));
-  field_interval = 1; //status_interval;
-  hydro_interval = 1; //status_interval;
+  status_interval      = int(8./(wci*dt));
+  field_interval = status_interval;
+  hydro_interval = status_interval;
   sync_shared_interval = status_interval;
   clean_div_e_interval = status_interval;
   clean_div_b_interval = status_interval;
 
   global->energies_interval  = status_interval;
-  global->fields_interval    = 1; //status_interval;
-  global->ehydro_interval    = 1; //status_interval;
-  global->ihydro_interval    = 1; //status_interval;
+  global->fields_interval    = status_interval;
+  global->ehydro_interval    = status_interval;
+  global->ihydro_interval    = status_interval;
   global->eparticle_interval = status_interval;
   global->iparticle_interval = status_interval;
   global->restart_interval   = status_interval;
