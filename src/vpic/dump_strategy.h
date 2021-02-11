@@ -25,7 +25,7 @@
 
 //#define HAS_INDEPENDENT_IO 1
 
-#define HAS_EXPLICIT_ASYNC 1
+// #define HAS_EXPLICIT_ASYNC 1
 
 #include <cassert>
 #include <mpi.h> // TODO: it would be good if this didn't have to know about MPI
@@ -382,9 +382,7 @@ private:
 #  ifdef HAS_PARTICLE_COMP
   hid_t particle_type_id;
 #  endif
-#  ifdef HAS_EXPLICIT_ASYNC
   hid_t es_field, es_hydro, es_particle;
-#  endif
   const char *fprefix;
 
   hid_t H5Tcreate_fields(void);

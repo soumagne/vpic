@@ -171,19 +171,21 @@ HDF5Dump::HDF5Dump(int _rank, int _nproc) : Dump_Strategy(_rank, _nproc) {
     particle_type_id = H5Tcreate_particle();
 #endif
 #ifdef HAS_EXPLICIT_ASYNC
-  es_field = H5EScreate();
-  es_hydro = H5EScreate();
-  es_particle = H5EScreate();
+    es_field = H5EScreate();
+    es_hydro = H5EScreate();
+    es_particle = H5EScreate();
+#else
+    es_field = es_hydro = es_particle = H5I_INVALID_HID;
 #endif
-
-    fprefix = getenv("VPIC_FILE_PREFIX");
+    char *env_fprefix = getenv("VPIC_FILE_PREFIX");
+    fprefix = (env_fprefix) ? env_fprefix : "";
 }
 
 HDF5Dump::~HDF5Dump() {
 #ifdef HAS_EXPLICIT_ASYNC
-  H5ESclose(es_field);
-  H5ESclose(es_hydro);
-  H5ESclose(es_particle);
+    H5ESclose(es_field);
+    H5ESclose(es_hydro);
+    H5ESclose(es_particle);
 #endif
 
 #ifdef HAS_FIELD_COMP
@@ -201,7 +203,7 @@ hid_t HDF5Dump::H5Tcreate_fields(void) {
   hid_t comp_type = H5Tcreate(H5T_COMPOUND, sizeof(field_t));
 
   if (this->rank == 0)
-    std::cout << "-- Field type size is " << sizeof(field_t) << std::endl;
+      std::cout << "-- Field type size is " << sizeof(field_t) << std::endl;
 
   H5Tinsert(comp_type, "ex", HOFFSET(field_t, ex), H5T_NATIVE_FLOAT);
   H5Tinsert(comp_type, "ey", HOFFSET(field_t, ey), H5T_NATIVE_FLOAT);
@@ -242,7 +244,7 @@ hid_t HDF5Dump::H5Tcreate_hydro(void) {
   hid_t comp_type = H5Tcreate(H5T_COMPOUND, sizeof(hydro_t));
 
   if (this->rank == 0)
-    std::cout << "-- Hydro type size is " << sizeof(hydro_t) << std::endl;
+      std::cout << "-- Hydro type size is " << sizeof(hydro_t) << std::endl;
 
   H5Tinsert(comp_type, "jx", HOFFSET(hydro_t, jx), H5T_NATIVE_FLOAT);
   H5Tinsert(comp_type, "jy", HOFFSET(hydro_t, jy), H5T_NATIVE_FLOAT);
@@ -270,7 +272,7 @@ hid_t HDF5Dump::H5Tcreate_particle(void) {
   hid_t comp_type = H5Tcreate(H5T_COMPOUND, sizeof(particle_t));
 
   if (this->rank == 0)
-    std::cout << "-- Particle type size is " << sizeof(particle_t) << std::endl;
+      std::cout << "-- Particle type size is " << sizeof(particle_t) << std::endl;
 
   H5Tinsert(comp_type, "dx", HOFFSET(particle_t, dx), H5T_NATIVE_FLOAT);
   H5Tinsert(comp_type, "dy", HOFFSET(particle_t, dy), H5T_NATIVE_FLOAT);
