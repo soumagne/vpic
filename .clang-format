@@ -1,0 +1,14 @@
+BasedOnStyle:  LLVM
+---
+Language:        Cpp
+AlwaysBreakTemplateDeclarations: true
+#BreakBeforeBraces: Linux
+AccessModifierOffset: -2
+BinPackParameters: true
+IndentWidth: 2
+SpacesInParentheses: false
+BreakConstructorInitializersBeforeComma: true
+PointerAlignment: Right
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+IndentPPDirectives: AfterHash
+

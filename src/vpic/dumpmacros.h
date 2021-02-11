@@ -81,94 +81,94 @@
     (value) = __READ_tmp;            \
   } while(0)
 
-//#define F_WRITE_HEADER_V0(dump_type,sp_id,q_m,fileIO) do { \
-    ///* Binary compatibility information */                 \
-    //F_WRITE( char,      CHAR_BIT,               fileIO );  \
-    //F_WRITE( char,      sizeof(short int),      fileIO );  \
-    //F_WRITE( char,      sizeof(int),            fileIO );  \
-    //F_WRITE( char,      sizeof(float),          fileIO );  \
-    //F_WRITE( char,      sizeof(double),         fileIO );  \
-    //F_WRITE( short int, 0xcafe,                 fileIO );  \
-    //F_WRITE( int,       0xdeadbeef,             fileIO );  \
-    //F_WRITE( float,     1.0,                    fileIO );  \
-    //F_WRITE( double,    1.0,                    fileIO );  \
-    ///* Dump type and header format version */              \
-    //F_WRITE( int,       0 /* Version */,        fileIO );  \
-    //F_WRITE( int,       dump_type,              fileIO );  \
-    ///* High level information */                           \
-    //F_WRITE( int,       step(),                 fileIO );  \
-    //F_WRITE( int,       imxstr-2,               fileIO );  \
-    //F_WRITE( int,       jmxstr-2,               fileIO );  \
-    //F_WRITE( int,       kmxstr-2,               fileIO );  \
-    //F_WRITE( float,     grid->dt,               fileIO );  \
-    //F_WRITE( float,     dxstr,                  fileIO );  \
-    //F_WRITE( float,     dystr,                  fileIO );  \
-    //F_WRITE( float,     dzstr,                  fileIO );  \
-    //F_WRITE( float,     grid->x0,               fileIO );  \
-    //F_WRITE( float,     grid->y0,               fileIO );  \
-    //F_WRITE( float,     grid->z0,               fileIO );  \
-    //F_WRITE( float,     grid->cvac,             fileIO );  \
-    //F_WRITE( float,     grid->eps0,             fileIO );  \
-    //F_WRITE( float,     0 /*damp*/,             fileIO );  \
-    //F_WRITE( int,       rank(),                 fileIO );  \
-    //F_WRITE( int,       nproc(),                fileIO );  \
-    ///* Species parameters */                               \
-    //F_WRITE( int,       sp_id,                  fileIO );  \
-    //F_WRITE( float,     q_m,                    fileIO );  \
+//#define F_WRITE_HEADER_V0(dump_type,sp_id,q_m,fileIO) do {
+    ///* Binary compatibility information */                
+    //F_WRITE( char,      CHAR_BIT,               fileIO ); 
+    //F_WRITE( char,      sizeof(short int),      fileIO ); 
+    //F_WRITE( char,      sizeof(int),            fileIO ); 
+    //F_WRITE( char,      sizeof(float),          fileIO ); 
+    //F_WRITE( char,      sizeof(double),         fileIO ); 
+    //F_WRITE( short int, 0xcafe,                 fileIO ); 
+    //F_WRITE( int,       0xdeadbeef,             fileIO ); 
+    //F_WRITE( float,     1.0,                    fileIO ); 
+    //F_WRITE( double,    1.0,                    fileIO ); 
+    ///* Dump type and header format version */             
+    //F_WRITE( int,       0 /* Version */,        fileIO ); 
+    //F_WRITE( int,       dump_type,              fileIO ); 
+    ///* High level information */                          
+    //F_WRITE( int,       step(),                 fileIO ); 
+    //F_WRITE( int,       imxstr-2,               fileIO ); 
+    //F_WRITE( int,       jmxstr-2,               fileIO ); 
+    //F_WRITE( int,       kmxstr-2,               fileIO ); 
+    //F_WRITE( float,     grid->dt,               fileIO ); 
+    //F_WRITE( float,     dxstr,                  fileIO ); 
+    //F_WRITE( float,     dystr,                  fileIO ); 
+    //F_WRITE( float,     dzstr,                  fileIO ); 
+    //F_WRITE( float,     grid->x0,               fileIO ); 
+    //F_WRITE( float,     grid->y0,               fileIO ); 
+    //F_WRITE( float,     grid->z0,               fileIO ); 
+    //F_WRITE( float,     grid->cvac,             fileIO ); 
+    //F_WRITE( float,     grid->eps0,             fileIO ); 
+    //F_WRITE( float,     0 /*damp*/,             fileIO ); 
+    //F_WRITE( int,       rank(),                 fileIO ); 
+    //F_WRITE( int,       nproc(),                fileIO ); 
+    ///* Species parameters */                              
+    //F_WRITE( int,       sp_id,                  fileIO ); 
+    //F_WRITE( float,     q_m,                    fileIO ); 
   //} while(0)
 
-//#define F_WRITE_HEADER_PAR(dump_type,sp_id,q_m,fileIO) do { \
-    ///* Binary compatibility information */                  \
-    //F_WRITE( char,      CHAR_BIT,               fileIO );   \
-    //F_WRITE( char,      sizeof(short int),      fileIO );   \
-    //F_WRITE( char,      sizeof(int),            fileIO );   \
-    //F_WRITE( char,      sizeof(float),          fileIO );   \
-    //F_WRITE( char,      sizeof(double),         fileIO );   \
-    //F_WRITE( short int, 0xcafe,                 fileIO );   \
-    //F_WRITE( int,       0xdeadbeef,             fileIO );   \
-    //F_WRITE( float,     1.0,                    fileIO );   \
-    //F_WRITE( double,    1.0,                    fileIO );   \
-    ///* Dump type and header format version */               \
-    //F_WRITE( int,       0 /* Version */,        fileIO );   \
-    //F_WRITE( int,       dump_type,              fileIO );   \
-    ///* High level information */                            \
-    //F_WRITE( int,       step(),                 fileIO );   \
-    //F_WRITE( int,       grid->nx,               fileIO );   \
-    //F_WRITE( int,       grid->ny,               fileIO );   \
-    //F_WRITE( int,       grid->nz,               fileIO );   \
-    //F_WRITE( float,     grid->dt,               fileIO );   \
-    //F_WRITE( float,     grid->dx,               fileIO );   \
-    //F_WRITE( float,     grid->dy,               fileIO );   \
-    //F_WRITE( float,     grid->dz,               fileIO );   \
-    //F_WRITE( float,     grid->x0,               fileIO );   \
-    //F_WRITE( float,     grid->y0,               fileIO );   \
-    //F_WRITE( float,     grid->z0,               fileIO );   \
-    //F_WRITE( float,     grid->cvac,             fileIO );   \
-    //F_WRITE( float,     grid->eps0,             fileIO );   \
-    //F_WRITE( float,     0 /*damp*/,             fileIO );   \
-    //F_WRITE( int,       rank(),                 fileIO );   \
-    //F_WRITE( int,       nproc(),                fileIO );   \
-    ///* Species parameters */                                \
-    //F_WRITE( int,       sp_id,                  fileIO );   \
-    //F_WRITE( float,     q_m,                    fileIO );   \
+//#define F_WRITE_HEADER_PAR(dump_type,sp_id,q_m,fileIO) do {
+    ///* Binary compatibility information */                 
+    //F_WRITE( char,      CHAR_BIT,               fileIO );  
+    //F_WRITE( char,      sizeof(short int),      fileIO );  
+    //F_WRITE( char,      sizeof(int),            fileIO );  
+    //F_WRITE( char,      sizeof(float),          fileIO );  
+    //F_WRITE( char,      sizeof(double),         fileIO );  
+    //F_WRITE( short int, 0xcafe,                 fileIO );  
+    //F_WRITE( int,       0xdeadbeef,             fileIO );  
+    //F_WRITE( float,     1.0,                    fileIO );  
+    //F_WRITE( double,    1.0,                    fileIO );  
+    ///* Dump type and header format version */              
+    //F_WRITE( int,       0 /* Version */,        fileIO );  
+    //F_WRITE( int,       dump_type,              fileIO );  
+    ///* High level information */                           
+    //F_WRITE( int,       step(),                 fileIO );  
+    //F_WRITE( int,       grid->nx,               fileIO );  
+    //F_WRITE( int,       grid->ny,               fileIO );  
+    //F_WRITE( int,       grid->nz,               fileIO );  
+    //F_WRITE( float,     grid->dt,               fileIO );  
+    //F_WRITE( float,     grid->dx,               fileIO );  
+    //F_WRITE( float,     grid->dy,               fileIO );  
+    //F_WRITE( float,     grid->dz,               fileIO );  
+    //F_WRITE( float,     grid->x0,               fileIO );  
+    //F_WRITE( float,     grid->y0,               fileIO );  
+    //F_WRITE( float,     grid->z0,               fileIO );  
+    //F_WRITE( float,     grid->cvac,             fileIO );  
+    //F_WRITE( float,     grid->eps0,             fileIO );  
+    //F_WRITE( float,     0 /*damp*/,             fileIO );  
+    //F_WRITE( int,       rank(),                 fileIO );  
+    //F_WRITE( int,       nproc(),                fileIO );  
+    ///* Species parameters */                               
+    //F_WRITE( int,       sp_id,                  fileIO );  
+    //F_WRITE( float,     q_m,                    fileIO );  
   //} while(0)
 
 // Note dim _MUST_ be a pointer to an int
-//#define F_WRITE_ARRAY_HEADER(psiz,ndim,dim,fileIO) do { \
-    //F_WRITE( int, psiz, fileIO );                       \
-    //F_WRITE( int, ndim, fileIO );                       \
-    //fileIO.write( dim, ndim );                          \
+//#define F_WRITE_ARRAY_HEADER(psiz,ndim,dim,fileIO) do {
+    //F_WRITE( int, psiz, fileIO );                      
+    //F_WRITE( int, ndim, fileIO );                      
+    //fileIO.write( dim, ndim );                         
   //} while(0)
 
-//#define F_WRITE(type,value,fileIO) do { \
-    //type __F_WRITE_tmp = (type)(value); \
-    //fileIO.write( &__F_WRITE_tmp, 1 );  \
+//#define F_WRITE(type,value,fileIO) do {
+    //type __F_WRITE_tmp = (type)(value);
+    //fileIO.write( &__F_WRITE_tmp, 1 ); 
   //} while(0)
 
-//#define F_READ(type,value,fileIO) do { \
-    //type __F_READ_tmp;                 \
-    //fileIO.read( &__F_READ_tmp, 1 );   \
-    //(value) = __F_READ_tmp;            \
+//#define F_READ(type,value,fileIO) do {
+    //type __F_READ_tmp;                
+    //fileIO.read( &__F_READ_tmp, 1 );  
+    //(value) = __F_READ_tmp;           
   //} while(0)
 
 #define ABORT(cond) if( cond ) ERROR(( #cond ))

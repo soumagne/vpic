@@ -3,6 +3,7 @@
 
 #define FIELD_ARRAY_NAME field_array
 
+#ifdef OUTPUT_XDMF
 namespace VPIC_HDF {
     // XML header stuff
     static const char *header = "<?xml version=\"1.0\"?>\n<!DOCTYPE Xdmf SYSTEM \"Xdmf.dtd\" []>\n<Xdmf xmlns:xi=\"http://www.w3.org/2001/XInclude\" Version=\"2.0\">\n\t<Domain>\n";
@@ -38,6 +39,7 @@ namespace VPIC_HDF {
                                         \t\t\t\t</Attribute>  \n ";
 
 } // end namespace
+#endif
 
 #define create_file_with_header(xml_file_name, dimensions, orignal, dxdydz, nframes, fields_interval) \
     {                                                                                                   \

@@ -114,7 +114,7 @@ struct DumpParameters {
   DumpFormat format;
 
   char name[128];
-  char baseDir[128];
+  char baseDir[64];
   char baseFileName[128];
 
 }; // struct DumpParameters

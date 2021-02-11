@@ -4,26 +4,6 @@
 //}
 #include "dump_strategy.h"
 
-#if USE_ASYNC
-hid_t es_field;
-hid_t es_hydro;
-hid_t es_particle;
-hbool_t es_err;
-#if HAS_FIELD_COMP
-  field_t* temp_field=NULL;
-#else
-  float* temp_field=NULL;
-#endif
-#if HAS_HYDRO_COMP
-  hydro_t *temp_hydro = NULL;
-#else
-  float *temp_hydro = NULL;
-#endif
-#ifdef  HAS_PARTICLE_COMP
-  float* temp_particle = NULL;
-#endif
-#endif
-
 void BinaryDump::dump_fields(
         const char *fbase,
         int step,
@@ -178,4 +158,130 @@ void BinaryDump::dump_hydro(
     WRITE_ARRAY_HEADER( hydro_array->h, 3, dim, fileIO );
     fileIO.write( hydro_array->h, dim[0]*dim[1]*dim[2] );
     if( fileIO.close() ) ERROR(( "File close failed on dump hydro!!!" ));
+}
+
+HDF5Dump::HDF5Dump(int _rank, int _nproc) : Dump_Strategy(_rank, _nproc) {
+#ifdef HAS_FIELD_COMP
+    field_type_id = H5Tcreate_fields();
+#endif
+#ifdef HAS_HYDRO_COMP
+    hydro_type_id = H5Tcreate_hydro();
+#endif
+#ifdef HAS_PARTICLE_COMP
+    particle_type_id = H5Tcreate_particle();
+#endif
+#ifdef HAS_EXPLICIT_ASYNC
+  es_field = H5EScreate();
+  es_hydro = H5EScreate();
+  es_particle = H5EScreate();
+#endif
+
+    fprefix = getenv("VPIC_FILE_PREFIX");
+}
+
+HDF5Dump::~HDF5Dump() {
+#ifdef HAS_EXPLICIT_ASYNC
+  H5ESclose(es_field);
+  H5ESclose(es_hydro);
+  H5ESclose(es_particle);
+#endif
+
+#ifdef HAS_FIELD_COMP
+    H5Tclose(field_type_id);
+    #endif
+#ifdef HAS_HYDRO_COMP
+    H5Tclose(hydro_type_id);
+#endif
+#ifdef HAS_PARTICLE_COMP
+    H5Tclose(particle_type_id);
+#endif
+}
+
+hid_t HDF5Dump::H5Tcreate_fields(void) {
+  hid_t comp_type = H5Tcreate(H5T_COMPOUND, sizeof(field_t));
+
+  if (this->rank == 0)
+    std::cout << "-- Field type size is " << sizeof(field_t) << std::endl;
+
+  H5Tinsert(comp_type, "ex", HOFFSET(field_t, ex), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "ey", HOFFSET(field_t, ey), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "ez", HOFFSET(field_t, ez), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "div_e_err", HOFFSET(field_t, div_e_err),
+            H5T_NATIVE_FLOAT);
+
+  H5Tinsert(comp_type, "cbx", HOFFSET(field_t, cbx), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "cby", HOFFSET(field_t, cby), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "cbz", HOFFSET(field_t, cbz), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "div_b_err", HOFFSET(field_t, div_b_err),
+            H5T_NATIVE_FLOAT);
+
+  H5Tinsert(comp_type, "tcax", HOFFSET(field_t, tcax), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "tcay", HOFFSET(field_t, tcay), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "tcaz", HOFFSET(field_t, tcaz), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "rhob", HOFFSET(field_t, rhob), H5T_NATIVE_FLOAT);
+
+  H5Tinsert(comp_type, "jfx", HOFFSET(field_t, jfx), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "jfy", HOFFSET(field_t, jfy), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "jfz", HOFFSET(field_t, jfz), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "rhof", HOFFSET(field_t, rhof), H5T_NATIVE_FLOAT);
+
+  H5Tinsert(comp_type, "ematx", HOFFSET(field_t, ematx), H5T_NATIVE_SHORT);
+  H5Tinsert(comp_type, "ematy", HOFFSET(field_t, ematy), H5T_NATIVE_SHORT);
+  H5Tinsert(comp_type, "ematz", HOFFSET(field_t, ematz), H5T_NATIVE_SHORT);
+  H5Tinsert(comp_type, "nmat", HOFFSET(field_t, nmat), H5T_NATIVE_SHORT);
+
+  H5Tinsert(comp_type, "fmatx", HOFFSET(field_t, fmatx), H5T_NATIVE_SHORT);
+  H5Tinsert(comp_type, "fmaty", HOFFSET(field_t, fmaty), H5T_NATIVE_SHORT);
+  H5Tinsert(comp_type, "fmatz", HOFFSET(field_t, fmatz), H5T_NATIVE_SHORT);
+  H5Tinsert(comp_type, "cmat", HOFFSET(field_t, cmat), H5T_NATIVE_SHORT);
+
+  return comp_type;
+}
+
+hid_t HDF5Dump::H5Tcreate_hydro(void) {
+  hid_t comp_type = H5Tcreate(H5T_COMPOUND, sizeof(hydro_t));
+
+  if (this->rank == 0)
+    std::cout << "-- Hydro type size is " << sizeof(hydro_t) << std::endl;
+
+  H5Tinsert(comp_type, "jx", HOFFSET(hydro_t, jx), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "jy", HOFFSET(hydro_t, jy), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "jz", HOFFSET(hydro_t, jz), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "rho", HOFFSET(hydro_t, rho), H5T_NATIVE_FLOAT);
+
+  H5Tinsert(comp_type, "px", HOFFSET(hydro_t, px), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "py", HOFFSET(hydro_t, py), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "pz", HOFFSET(hydro_t, pz), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "ke", HOFFSET(hydro_t, ke), H5T_NATIVE_FLOAT);
+
+  H5Tinsert(comp_type, "txx", HOFFSET(hydro_t, txx), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "tyy", HOFFSET(hydro_t, tyy), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "tzz", HOFFSET(hydro_t, tzz), H5T_NATIVE_FLOAT);
+
+  H5Tinsert(comp_type, "tyz", HOFFSET(hydro_t, tyz), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "tzx", HOFFSET(hydro_t, tzx), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "txy", HOFFSET(hydro_t, txy), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "pad", HOFFSET(hydro_t, _pad), H5T_NATIVE_DOUBLE);
+
+  return comp_type;
+}
+
+hid_t HDF5Dump::H5Tcreate_particle(void) {
+  hid_t comp_type = H5Tcreate(H5T_COMPOUND, sizeof(particle_t));
+
+  if (this->rank == 0)
+    std::cout << "-- Particle type size is " << sizeof(particle_t) << std::endl;
+
+  H5Tinsert(comp_type, "dx", HOFFSET(particle_t, dx), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "dy", HOFFSET(particle_t, dy), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "dz", HOFFSET(particle_t, dz), H5T_NATIVE_FLOAT);
+
+  H5Tinsert(comp_type, "i", HOFFSET(particle_t, i), H5T_NATIVE_INT);
+
+  H5Tinsert(comp_type, "ux", HOFFSET(particle_t, ux), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "uy", HOFFSET(particle_t, uy), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "uz", HOFFSET(particle_t, uz), H5T_NATIVE_FLOAT);
+  H5Tinsert(comp_type, "w", HOFFSET(particle_t, w), H5T_NATIVE_FLOAT);
+
+  return comp_type;
 }
