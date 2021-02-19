@@ -410,10 +410,11 @@ public:
    */
   void dump_fields(const char *fbase, int step, grid_t *grid,
                    field_array_t *field_array, int ftag) {
-    double dump_field_uptime = uptime();
+    // double dump_field_uptime = uptime();
     int mpi_size, mpi_rank;
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+        double t_start = uptime();
 
 #  ifdef DUMP_INFO_DEBUG
     printf("MPI rank = %d, size = %d \n", mpi_rank, mpi_size);
@@ -440,7 +441,7 @@ public:
     FileUtils::makeDirectory(subfield_scratch);
 
     sprintf(fname, "%s%s/%s_%d.h5", fprefix, subfield_scratch, "fields", step);
-    double el1 = uptime();
+    // double el1 = uptime();
 
     //    int file_exist(const char *filename)
     //{
@@ -477,9 +478,9 @@ public:
     hid_t group_id = H5Gcreate_wrap(file_id, fname, H5P_DEFAULT, H5P_DEFAULT,
                                     H5P_DEFAULT, es_field);
 
-    io_log("TimeHDF5Open:  " << uptime() - el1
-                             << " s"); // Easy to handle results for scripts
-    double el2 = uptime();
+    // io_log("TimeHDF5Open:  " << uptime() - el1
+                            //  << " s"); // Easy to handle results for scripts
+    // double el2 = uptime();
 
     /*
     // Create a variable list of field values to output.
@@ -801,8 +802,8 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 }
 */
 
-    io_log("TimeHDF5Write: " << uptime() - el2 << " s");
-    double el3 = uptime();
+    // io_log("TimeHDF5Write: " << uptime() - el2 << " s");
+    // double el3 = uptime();
 
     /*
     //Write metadata (geo original and geo dx/dy/dz) for ArrayUDF
@@ -848,7 +849,7 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 #    endif // HAS_FIELD_COMP
 #  endif
 
-    io_log("TimeHDF5Close: " << uptime() - el3 << " s");
+    // io_log("TimeHDF5Close: " << uptime() - el3 << " s");
 
 #  ifdef OUTPUT_XDMF
     if (mpi_rank == 0) {
@@ -912,10 +913,11 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
       field_tframe++;
     }
 #  endif // OUTPUT_XDMF
+    double t_end = uptime();
     if (!rank)
       printf("Total dump field time for %d fields: %lf\n",
              (grid->nx) * (grid->ny) * (grid->nz),
-             uptime() - dump_field_uptime);
+             t_end - t_start);
   }
   /**
    * @brief dump_particles to the HDF5 file
@@ -935,7 +937,8 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     file_index++;
     int mpi_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    double dump_particles_uptime = uptime();
+    // double dump_particles_uptime = uptime();
+        double t_start = uptime();
     // time_t seconds = time(NULL);
     // printf("Atrank = %d, file_index = %d, dump_particles_uptime = %f,
     // epoch_seconds = %ld  \n ", mpi_rank, file_index, dump_particles_uptime,
@@ -1007,7 +1010,7 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 #  endif // N_FILE_N_PROCESS
 
     sprintf(group_name, "/Timestep_%d", step);
-    double el1 = uptime();
+    // double el1 = uptime();
 
     hid_t file_plist_id = H5Pcreate(H5P_FILE_ACCESS);
 
@@ -1029,9 +1032,9 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     hid_t group_id = H5Gcreate_wrap(file_id, group_name, H5P_DEFAULT,
                                     H5P_DEFAULT, H5P_DEFAULT, es_particle);
 
-    io_log("TimeHDF5Open:  " << uptime() - el1
-                             << " s"); // Easy to handle results for scripts
-    double el2 = uptime();
+    // io_log("TimeHDF5Open:  " << uptime() - el1
+                            //  << " s"); // Easy to handle results for scripts
+    // double el2 = uptime();
 
 #  ifdef HAS_PARTICLE_MAP
     hid_t map_id =
@@ -1141,8 +1144,8 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     H5Pclose(io_plist_id);
 #  endif       // HAS_PARTICLE_MAP
 
-    io_log("TimeHDF5Write: " << uptime() - el2 << " s");
-    double el3 = uptime();
+    // io_log("TimeHDF5Write: " << uptime() - el2 << " s");
+    // double el3 = uptime();
 
     H5Gclose_wrap(group_id, es_particle);
     H5Fclose_wrap(file_id, es_particle);
@@ -1162,11 +1165,12 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     }
 #  endif // HAS_EXPLICIT_ASYNC
 
-    io_log("TimeHDF5Close: " << uptime() - el3 << " s");
+    // io_log("TimeHDF5Close: " << uptime() - el3 << " s");
+    double t_end = uptime();
 
     if (!rank)
       printf("Total dump %s particles time for %lld particles: %lf\n", sp->name,
-             sp->np, uptime() - dump_particles_uptime);
+             sp->np, t_end - t_start);
   }
 
   /**
@@ -1185,10 +1189,11 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
   void dump_hydro(const char *fbase, int step, hydro_array_t *hydro_array,
                   species_t *sp, interpolator_array_t *interpolator_array,
                   grid_t *grid, int ftag) {
-    double dump_hydro_uptime = uptime();
+    // double dump_hydro_uptime = uptime();
     int mpi_size, mpi_rank;
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+        double t_start = uptime();
 
     if (!sp) {
       ERROR(("Invalid species"));
@@ -1209,7 +1214,7 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 
     sprintf(hname, "%s%s/hydro_%s_%d.h5", fprefix, subhydro_scratch, sp->name,
             step);
-    double el1 = uptime();
+    // double el1 = uptime();
     hid_t plist_id = H5Pcreate(H5P_FILE_ACCESS);
     /*
        if(H5Pset_libver_bounds(plist_id, H5F_LIBVER_LATEST, H5F_LIBVER_LATEST) <
@@ -1228,10 +1233,10 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     hid_t group_id = H5Gcreate_wrap(file_id, hname, H5P_DEFAULT, H5P_DEFAULT,
                                     H5P_DEFAULT, es_hydro);
 
-    el1 = uptime() - el1;
-    io_log("TimeHDF5Open:  " << el1
-                             << " s"); // Easy to handle results for scripts
-    double el2 = uptime();
+    // el1 = uptime() - el1;
+    // io_log("TimeHDF5Open:  " << el1
+                            //  << " s"); // Easy to handle results for scripts
+    // double el2 = uptime();
 
     // Create a variable list of field values to output.
     // size_t numvars = std::min(global->fdParams.output_vars.bitsum(),
@@ -1392,10 +1397,10 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     H5Sclose(memspace);
 #  endif
 
-    el2 = uptime() - el2;
-    io_log("TimeHDF5Write: " << el2 << " s");
+    // el2 = uptime() - el2;
+    // io_log("TimeHDF5Write: " << el2 << " s");
 
-    double el3 = uptime();
+    // double el3 = uptime();
 
     // Write metadata (geo original and geo dx/dy/dz) for ArrayUDF
     /*
@@ -1438,8 +1443,8 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 #    endif
 #  endif
 
-    el3 = uptime() - el3;
-    io_log("TimeHDF5Close: " << el3 << " s");
+    // el3 = uptime() - el3;
+    // io_log("TimeHDF5Close: " << el3 << " s");
 
 #  ifdef OUTPUT_XDMF
     if (mpi_rank == 0) {
@@ -1503,10 +1508,11 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
       tframe_map[sp->id]++;
     }
 #  endif // OUTPUT_XDMF
+    double t_end = uptime();
     if (!rank)
       printf("Total dump %s hydro time for %d fields: %lf\n", sp->name,
              (grid->nx) * (grid->ny) * (grid->nz),
-             uptime() - dump_hydro_uptime);
+             t_end - t_start);
   }
 };
 #endif // VPIC_ENABLE_HDF5
