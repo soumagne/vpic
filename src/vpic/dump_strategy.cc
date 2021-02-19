@@ -179,6 +179,9 @@ HDF5Dump::HDF5Dump(int _rank, int _nproc) : Dump_Strategy(_rank, _nproc) {
 #endif
     char *env_fprefix = getenv("VPIC_FILE_PREFIX");
     fprefix = (env_fprefix) ? env_fprefix : "";
+
+    char *env_dump_dir = getenv("VPIC_DUMP_DIR");
+    dump_dir = (env_dump_dir) ? env_dump_dir : ".";
 }
 
 HDF5Dump::~HDF5Dump() {

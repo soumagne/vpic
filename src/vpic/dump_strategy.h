@@ -94,8 +94,6 @@
     H5Dclose(dset_id);                                                         \
   }
 
-#define DUMP_DIR_FORMAT "./%s"
-
 // TODO: naming a macro so close to existing functions AND data is not a good
 // define to do C-style indexing
 #define _hydro(x, y, z)                                                        \
@@ -384,6 +382,7 @@ private:
 #  endif
   hid_t es_field, es_hydro, es_particle;
   const char *fprefix;
+  const char *dump_dir;
 
   hid_t H5Tcreate_fields(void);
   hid_t H5Tcreate_hydro(void);
@@ -431,11 +430,11 @@ public:
            grid->sz, grid->nv);
 #  endif // DUMP_INFO_DEBUG
 
-    char fname[256];
-    char field_scratch[64];
-    char subfield_scratch[128];
+    char fname[1024];
+    char field_scratch[256];
+    char subfield_scratch[512];
 
-    sprintf(field_scratch, DUMP_DIR_FORMAT, "field_hdf5");
+    sprintf(field_scratch, "%s/%s", dump_dir, "field_hdf5");
     FileUtils::makeDirectory(field_scratch);
     sprintf(subfield_scratch, "%s/T.%d/", field_scratch, step);
     FileUtils::makeDirectory(subfield_scratch);
@@ -942,16 +941,16 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     // epoch_seconds = %ld  \n ", mpi_rank, file_index, dump_particles_uptime,
     // seconds);
 
-    char fname[256];
-    char group_name[256];
-    char particle_scratch[64];
-    char subparticle_scratch[128];
+    char fname[1024];
+    char group_name[1024];
+    char particle_scratch[256];
+    char subparticle_scratch[512];
 
     int np_local = sp->np;
 
     // get the total number of particles. in this example, output only electrons
     // sp = species_list;
-    sprintf(particle_scratch, DUMP_DIR_FORMAT, "particle_hdf5");
+    sprintf(particle_scratch, "%s/%s", dump_dir, "particle_hdf5");
     FileUtils::makeDirectory(particle_scratch);
     sprintf(subparticle_scratch, "%s/T.%d/", particle_scratch, step);
     FileUtils::makeDirectory(subparticle_scratch);
@@ -1199,11 +1198,11 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     accumulate_hydro_p(hydro_array, sp, interpolator_array);
     synchronize_hydro_array(hydro_array);
 
-    char hname[256];
-    char hydro_scratch[64];
-    char subhydro_scratch[128];
+    char hname[1024];
+    char hydro_scratch[256];
+    char subhydro_scratch[512];
 
-    sprintf(hydro_scratch, "./%s", "hydro_hdf5");
+    sprintf(hydro_scratch, "%s/%s", dump_dir, "hydro_hdf5");
     FileUtils::makeDirectory(hydro_scratch);
     sprintf(subhydro_scratch, "%s/T.%d/", hydro_scratch, step);
     FileUtils::makeDirectory(subhydro_scratch);
