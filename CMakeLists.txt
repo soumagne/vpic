@@ -316,6 +316,12 @@ if(USE_HDF5)
     string(REPLACE ";" " " string_libraries "${HDF5_C_LIBRARIES}")
     set(VPIC_CXX_LIBRARIES "${VPIC_CXX_LIBRARIES} -I${HDF5_INCLUDE_DIRS} ${string_libraries}")
     include_directories(${HDF5_INCLUDE_DIRS})
+
+    option(USE_EXPLICIT_ASYNC "Use HDF5 asynchronous I/O" OFF)
+    if (USE_EXPLICIT_ASYNC)
+        add_definitions(-DHAS_EXPLICIT_ASYNC)
+    endif()
+
 endif(USE_HDF5)
 
 #------------------------------------------------------------------------------#
