@@ -414,7 +414,7 @@ public:
     int mpi_size, mpi_rank;
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-        double t_start = uptime();
+    double t_start = uptime();
 
 #  ifdef DUMP_INFO_DEBUG
     printf("MPI rank = %d, size = %d \n", mpi_rank, mpi_size);
@@ -435,12 +435,16 @@ public:
     char field_scratch[256];
     char subfield_scratch[512];
 
-    sprintf(field_scratch, "%s/%s", dump_dir, "field_hdf5");
-    FileUtils::makeDirectory(field_scratch);
-    sprintf(subfield_scratch, "%s/T.%d/", field_scratch, step);
-    FileUtils::makeDirectory(subfield_scratch);
+    if (strcmp(dump_dir, ".") == 0)
+      sprintf(field_scratch, "%s", "field_hdf5");
+    else
+      sprintf(field_scratch, "%s/%s", dump_dir, "field_hdf5");
 
-    sprintf(fname, "%s%s/%s_%d.h5", fprefix, subfield_scratch, "fields", step);
+    // FileUtils::makeDirectory(field_scratch);
+    sprintf(subfield_scratch, "%s_T_%d", field_scratch, step);
+    // FileUtils::makeDirectory(subfield_scratch);
+
+    sprintf(fname, "%s%s_%s_%d.h5", fprefix, subfield_scratch, "fields", step);
     // double el1 = uptime();
 
     //    int file_exist(const char *filename)
@@ -479,7 +483,7 @@ public:
                                     H5P_DEFAULT, es_field);
 
     // io_log("TimeHDF5Open:  " << uptime() - el1
-                            //  << " s"); // Easy to handle results for scripts
+    //  << " s"); // Easy to handle results for scripts
     // double el2 = uptime();
 
     /*
@@ -916,8 +920,7 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     double t_end = uptime();
     if (!rank)
       printf("Total dump field time for %d fields: %lf\n",
-             (grid->nx) * (grid->ny) * (grid->nz),
-             t_end - t_start);
+             (grid->nx) * (grid->ny) * (grid->nz), t_end - t_start);
   }
   /**
    * @brief dump_particles to the HDF5 file
@@ -938,7 +941,7 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     int mpi_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
     // double dump_particles_uptime = uptime();
-        double t_start = uptime();
+    double t_start = uptime();
     // time_t seconds = time(NULL);
     // printf("Atrank = %d, file_index = %d, dump_particles_uptime = %f,
     // epoch_seconds = %ld  \n ", mpi_rank, file_index, dump_particles_uptime,
@@ -953,10 +956,13 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 
     // get the total number of particles. in this example, output only electrons
     // sp = species_list;
-    sprintf(particle_scratch, "%s/%s", dump_dir, "particle_hdf5");
-    FileUtils::makeDirectory(particle_scratch);
-    sprintf(subparticle_scratch, "%s/T.%d/", particle_scratch, step);
-    FileUtils::makeDirectory(subparticle_scratch);
+    if (strcmp(dump_dir, ".") == 0)
+      sprintf(particle_scratch, "%s", "particle_hdf5");
+    else
+      sprintf(particle_scratch, "%s/%s", dump_dir, "particle_hdf5");
+    // FileUtils::makeDirectory(particle_scratch);
+    sprintf(subparticle_scratch, "%s_T_%d", particle_scratch, step);
+    // FileUtils::makeDirectory(subparticle_scratch);
 
     // TODO: Allow the user to set this
     int stride_particle_dump = 1;
@@ -1002,7 +1008,7 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     // open HDF5 file in "particle/T.<step>/" subdirectory
     // filename: eparticle.h5p
 #  ifndef N_FILE_N_PROCESS
-    sprintf(fname, "%s%s/%s_%d.h5", fprefix, subparticle_scratch, sp->name,
+    sprintf(fname, "%s%s_%s_%d.h5", fprefix, subparticle_scratch, sp->name,
             step);
 #  else  // N_FILE_N_PROCESS
     sprintf(fname, "%s%s/%s_%d_p%d.h5", fprefix, subparticle_scratch, sp->name,
@@ -1033,7 +1039,7 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
                                     H5P_DEFAULT, H5P_DEFAULT, es_particle);
 
     // io_log("TimeHDF5Open:  " << uptime() - el1
-                            //  << " s"); // Easy to handle results for scripts
+    //  << " s"); // Easy to handle results for scripts
     // double el2 = uptime();
 
 #  ifdef HAS_PARTICLE_MAP
@@ -1193,7 +1199,7 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     int mpi_size, mpi_rank;
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-        double t_start = uptime();
+    double t_start = uptime();
 
     if (!sp) {
       ERROR(("Invalid species"));
@@ -1207,12 +1213,15 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     char hydro_scratch[256];
     char subhydro_scratch[512];
 
-    sprintf(hydro_scratch, "%s/%s", dump_dir, "hydro_hdf5");
-    FileUtils::makeDirectory(hydro_scratch);
-    sprintf(subhydro_scratch, "%s/T.%d/", hydro_scratch, step);
-    FileUtils::makeDirectory(subhydro_scratch);
+    if (strcmp(dump_dir, ".") == 0)
+      sprintf(hydro_scratch, "%s", "hydro_hdf5");
+    else
+      sprintf(hydro_scratch, "%s/%s", dump_dir, "hydro_hdf5");
+    // FileUtils::makeDirectory(hydro_scratch);
+    sprintf(subhydro_scratch, "%s_T_%d", hydro_scratch, step);
+    // FileUtils::makeDirectory(subhydro_scratch);
 
-    sprintf(hname, "%s%s/hydro_%s_%d.h5", fprefix, subhydro_scratch, sp->name,
+    sprintf(hname, "%s%s_hydro_%s_%d.h5", fprefix, subhydro_scratch, sp->name,
             step);
     // double el1 = uptime();
     hid_t plist_id = H5Pcreate(H5P_FILE_ACCESS);
@@ -1235,7 +1244,7 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 
     // el1 = uptime() - el1;
     // io_log("TimeHDF5Open:  " << el1
-                            //  << " s"); // Easy to handle results for scripts
+    //  << " s"); // Easy to handle results for scripts
     // double el2 = uptime();
 
     // Create a variable list of field values to output.
@@ -1511,8 +1520,7 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     double t_end = uptime();
     if (!rank)
       printf("Total dump %s hydro time for %d fields: %lf\n", sp->name,
-             (grid->nx) * (grid->ny) * (grid->nz),
-             t_end - t_start);
+             (grid->nx) * (grid->ny) * (grid->nz), t_end - t_start);
   }
 };
 #endif // VPIC_ENABLE_HDF5
