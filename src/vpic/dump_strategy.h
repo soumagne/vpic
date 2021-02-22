@@ -461,7 +461,7 @@ public:
     int mpi_size, mpi_rank;
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    double t_start = uptime();
+    // double t_start = uptime();
 
 #  ifdef DUMP_INFO_DEBUG
     printf("MPI rank = %d, size = %d \n", mpi_rank, mpi_size);
@@ -966,10 +966,10 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
       field_tframe++;
     }
 #  endif // OUTPUT_XDMF
-    double t_end = uptime();
-    if (!rank)
-      printf("Total dump field time for %d fields: %lf\n",
-             (grid->nx) * (grid->ny) * (grid->nz), t_end - t_start);
+    // double t_end = uptime();
+    // if (!rank)
+    //   printf("Total dump field time for %d fields: %lf\n",
+    //          (grid->nx) * (grid->ny) * (grid->nz), t_end - t_start);
   }
   /**
    * @brief dump_particles to the HDF5 file
@@ -990,7 +990,7 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     int mpi_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
     // double dump_particles_uptime = uptime();
-    double t_start = uptime();
+    // double t_start = uptime();
     // time_t seconds = time(NULL);
     // printf("Atrank = %d, file_index = %d, dump_particles_uptime = %f,
     // epoch_seconds = %ld  \n ", mpi_rank, file_index, dump_particles_uptime,
@@ -1168,7 +1168,7 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
                        H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT, es_particle);
 
     if (async) {
-      asyncWait(es_particle, H5ES_WAIT_FOREVER);
+      // asyncWait(es_particle, H5ES_WAIT_FOREVER);
     }
 
     H5Dwrite_wrap(dset_id, particle_type_id, memspace, filespace, io_plist_id,
@@ -1230,11 +1230,11 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     }
 
     // io_log("TimeHDF5Close: " << uptime() - el3 << " s");
-    double t_end = uptime();
+    // double t_end = uptime();
 
-    if (!rank)
-      printf("Total dump %s particles time for %lld particles: %lf\n", sp->name,
-             sp->np, t_end - t_start);
+    // if (!rank)
+    //   printf("Total dump %s particles time for %lld particles: %lf\n", sp->name,
+    //          sp->np, t_end - t_start);
   }
 
   /**
@@ -1257,7 +1257,7 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     int mpi_size, mpi_rank;
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    double t_start = uptime();
+    // double t_start = uptime();
 
     if (!sp) {
       ERROR(("Invalid species"));
@@ -1577,10 +1577,10 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
       tframe_map[sp->id]++;
     }
 #  endif // OUTPUT_XDMF
-    double t_end = uptime();
-    if (!rank)
-      printf("Total dump %s hydro time for %d fields: %lf\n", sp->name,
-             (grid->nx) * (grid->ny) * (grid->nz), t_end - t_start);
+  //   double t_end = uptime();
+  //   if (!rank)
+  //     printf("Total dump %s hydro time for %d fields: %lf\n", sp->name,
+  //            (grid->nx) * (grid->ny) * (grid->nz), t_end - t_start);
   }
 };
 #endif // VPIC_ENABLE_HDF5

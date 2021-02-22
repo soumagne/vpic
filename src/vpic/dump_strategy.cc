@@ -181,8 +181,11 @@ HDF5Dump::HDF5Dump(int _rank, int _nproc) : Dump_Strategy(_rank, _nproc) {
 
     if (async) {
         es_field = H5EScreate();
-        es_hydro = H5EScreate();
-        es_particle = H5EScreate();
+        // es_hydro = H5EScreate();
+        // es_particle = H5EScreate();
+
+        es_hydro = es_field;
+        es_particle = es_field;
     } else
         es_field = es_hydro = es_particle = H5I_INVALID_HID;
 
@@ -209,8 +212,8 @@ HDF5Dump::~HDF5Dump() {
         asyncWait(es_hydro, H5ES_WAIT_FOREVER);
         io_time += (MPI_Wtime() - t);
         H5ESclose(es_field);
-        H5ESclose(es_hydro);
-        H5ESclose(es_particle);
+        // H5ESclose(es_hydro);
+        // H5ESclose(es_particle);
     }
 
   if (this->rank == 0)
