@@ -1263,6 +1263,12 @@ double t_group_create2 = MPI_Wtime();
     H5Dwrite_wrap(q_id, H5T_NATIVE_FLOAT, memspace, filespace, io_plist_id,
                   Pf + 7, es_particle);
 
+    if (async) {
+      asyncWait(es_particle, H5ES_WAIT_FOREVER);
+    }
+
+    double t_end = uptime();
+
     H5Dclose_wrap(dx_id, es_particle);
     H5Dclose_wrap(dy_id, es_particle);
     H5Dclose_wrap(dz_id, es_particle);
@@ -1294,7 +1300,7 @@ double t_group_create2 = MPI_Wtime();
     }
 
     // io_log("TimeHDF5Close: " << uptime() - el3 << " s");
-    double t_end = uptime();
+    // double t_end = uptime();
 
     if (!rank)
       printf("(%d) Total dump %s particles time for %lld particles: %lf\n",
