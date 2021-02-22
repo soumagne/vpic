@@ -162,18 +162,22 @@ void BinaryDump::dump_hydro(
 
 HDF5Dump::HDF5Dump(int _rank, int _nproc) : Dump_Strategy(_rank, _nproc) {
 #ifdef HAS_FIELD_COMP
+    field_buf = NULL;
     field_type_id = H5Tcreate_fields();
 #endif
 #ifdef HAS_HYDRO_COMP
+    hydro_buf = NULL;
     hydro_type_id = H5Tcreate_hydro();
 #endif
 #ifdef HAS_PARTICLE_COMP
     particle_type_id = H5Tcreate_particle();
 #endif
+    io_time = 0;
 
     char *env_async = getenv("VPIC_ASYNC");
     async = (env_async) ? atoi(env_async) : 0;
-    std::cout << "--- Asynchronous I/O: " << async << std::endl;
+    if (this->rank == 0)
+        std::cout << "--- Asynchronous I/O: " << async << std::endl;
 
     if (async) {
         es_field = H5EScreate();
@@ -184,28 +188,40 @@ HDF5Dump::HDF5Dump(int _rank, int _nproc) : Dump_Strategy(_rank, _nproc) {
 
     char *env_fprefix = getenv("VPIC_FILE_PREFIX");
     fprefix = (env_fprefix) ? env_fprefix : "";
-    std::cout << "--- Using file prefix: " << fprefix << std::endl;
+    if (this->rank == 0)
+        std::cout << "--- Using file prefix: " << fprefix << std::endl;
 
     char *env_dump_dir = getenv("VPIC_DUMP_DIR");
     dump_dir = (env_dump_dir) ? env_dump_dir : ".";
-    std::cout << "--- Using dump dir: " << dump_dir << std::endl;
+    if (this->rank == 0)
+        std::cout << "--- Using dump dir: " << dump_dir << std::endl;
 
     char *env_indep_meta = getenv("VPIC_INDEP_META");
     indep_meta = (env_indep_meta) ? atoi(env_indep_meta) : 0;
-    std::cout << "--- Independent metadata: " << indep_meta << std::endl;
+    if (this->rank == 0)
+        std::cout << "--- Independent metadata: " << indep_meta << std::endl;
 }
 
 HDF5Dump::~HDF5Dump() {
     if (async) {
+        double t = MPI_Wtime();
+        asyncWait(es_field, H5ES_WAIT_FOREVER);
+        asyncWait(es_hydro, H5ES_WAIT_FOREVER);
+        io_time += (MPI_Wtime() - t);
         H5ESclose(es_field);
         H5ESclose(es_hydro);
         H5ESclose(es_particle);
     }
 
+  if (this->rank == 0)
+      std::cout << "-- Cumulated I/O time in HDF5 is " << io_time << "s" << std::endl;
+
 #ifdef HAS_FIELD_COMP
+    free(field_buf);
     H5Tclose(field_type_id);
     #endif
 #ifdef HAS_HYDRO_COMP
+    free(hydro_buf);
     H5Tclose(hydro_type_id);
 #endif
 #ifdef HAS_PARTICLE_COMP

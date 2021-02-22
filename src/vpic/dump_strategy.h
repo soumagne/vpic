@@ -273,9 +273,11 @@ class HDF5Dump : public Dump_Strategy {
 
 private:
 #  ifdef HAS_FIELD_COMP
+  field_t *field_buf;
   hid_t field_type_id;
 #  endif
 #  ifdef HAS_HYDRO_COMP
+  hydro_t *hydro_buf;
   hid_t hydro_type_id;
 #  endif
 #  ifdef HAS_PARTICLE_COMP
@@ -286,6 +288,7 @@ private:
   const char *dump_dir;
   int indep_meta;
   int async;
+  double io_time;
 
   hid_t H5Tcreate_fields(void);
   hid_t H5Tcreate_hydro(void);
@@ -293,101 +296,143 @@ private:
 
   inline hid_t H5Fcreate_wrap(const char *filename, unsigned flags,
                               hid_t fcpl_id, hid_t fapl_id, hid_t es_id) {
+    hid_t file_id;
+    double t = MPI_Wtime();
     if (async)
-      return H5Fcreate_async(filename, flags, fcpl_id, fapl_id, es_id);
+      file_id = H5Fcreate_async(filename, flags, fcpl_id, fapl_id, es_id);
     else
-      return H5Fcreate(filename, flags, fcpl_id, fapl_id);
+      file_id = H5Fcreate(filename, flags, fcpl_id, fapl_id);
+    io_time += (MPI_Wtime() - t);
+    return file_id;
   }
 
   inline herr_t H5Fclose_wrap(hid_t file_id, hid_t es_id) {
+    herr_t err;
+    double t = MPI_Wtime();
     if (async)
-      return H5Fclose_async(file_id, es_id);
+      err = H5Fclose_async(file_id, es_id);
     else
-      return H5Fclose(file_id);
+      err = H5Fclose(file_id);
+    io_time += (MPI_Wtime() - t);
+    return err;
   }
 
   inline hid_t H5Gcreate_wrap(hid_t loc_id, const char *name, hid_t lcpl_id,
                               hid_t gcpl_id, hid_t gapl_id, hid_t es_id) {
+    hid_t grp_id;
+    double t = MPI_Wtime();
     if (async)
-      return H5Gcreate_async(loc_id, name, lcpl_id, gcpl_id, gapl_id, es_id);
+      grp_id = H5Gcreate_async(loc_id, name, lcpl_id, gcpl_id, gapl_id, es_id);
     else
-      return H5Gcreate2(loc_id, name, lcpl_id, gcpl_id, gapl_id);
+      grp_id = H5Gcreate2(loc_id, name, lcpl_id, gcpl_id, gapl_id);
+    io_time += (MPI_Wtime() - t);
+    return grp_id;
   }
 
   inline herr_t H5Gclose_wrap(hid_t group_id, hid_t es_id) {
+    herr_t err;
+    double t = MPI_Wtime();
     if (async)
-      return H5Gclose_async(group_id, es_id);
+      err = H5Gclose_async(group_id, es_id);
     else
-      return H5Gclose(group_id);
+      err = H5Gclose(group_id);
+    io_time += (MPI_Wtime() - t);
+    return err;
   }
 
   inline hid_t H5Dcreate_wrap(hid_t loc_id, const char *name, hid_t type_id,
                               hid_t space_id, hid_t lcpl_id, hid_t dcpl_id,
                               hid_t dapl_id, hid_t es_id) {
+    hid_t dset_id;
+    double t = MPI_Wtime();
     if (async)
-      return H5Dcreate_async(loc_id, name, type_id, space_id, lcpl_id, dcpl_id,
-                             dapl_id, es_id);
+      dset_id = H5Dcreate_async(loc_id, name, type_id, space_id, lcpl_id,
+                                dcpl_id, dapl_id, es_id);
     else
-      return H5Dcreate(loc_id, name, type_id, space_id, lcpl_id, dcpl_id,
-                       dapl_id);
+      dset_id =
+          H5Dcreate(loc_id, name, type_id, space_id, lcpl_id, dcpl_id, dapl_id);
+    io_time += (MPI_Wtime() - t);
+    return dset_id;
   }
 
   inline herr_t H5Dwrite_wrap(hid_t dset_id, hid_t mem_type_id,
                               hid_t mem_space_id, hid_t file_space_id,
                               hid_t dxpl_id, const void *buf, hid_t es_id) {
+    herr_t err;
+    double t = MPI_Wtime();
     if (async)
-      return H5Dwrite_async(dset_id, mem_type_id, mem_space_id, file_space_id,
-                            dxpl_id, buf, es_id);
+      err = H5Dwrite_async(dset_id, mem_type_id, mem_space_id, file_space_id,
+                           dxpl_id, buf, es_id);
     else
-      return H5Dwrite(dset_id, mem_type_id, mem_space_id, file_space_id,
-                      dxpl_id, buf);
+      err = H5Dwrite(dset_id, mem_type_id, mem_space_id, file_space_id, dxpl_id,
+                     buf);
+    io_time += (MPI_Wtime() - t);
+    return err;
   }
 
   inline herr_t H5Dclose_wrap(hid_t dset_id, hid_t es_id) {
+    herr_t err;
+    double t = MPI_Wtime();
     if (async)
-      return H5Dclose_async(dset_id, es_id);
+      err = H5Dclose_async(dset_id, es_id);
     else
-      return H5Dclose(dset_id);
+      err = H5Dclose(dset_id);
+    io_time += (MPI_Wtime() - t);
+    return err;
   }
 
   inline hid_t H5Mcreate_wrap(hid_t loc_id, const char *name, hid_t key_type_id,
                               hid_t val_type_id, hid_t lcpl_id, hid_t mcpl_id,
                               hid_t mapl_id, hid_t es_id) {
+    hid_t map_id;
+    double t = MPI_Wtime();
     if (async)
-      return H5Mcreate_async(loc_id, name, key_type_id, val_type_id, lcpl_id,
-                             mcpl_id, mapl_id, es_id);
+      map_id = H5Mcreate_async(loc_id, name, key_type_id, val_type_id, lcpl_id,
+                               mcpl_id, mapl_id, es_id);
     else
-      return H5Mcreate(loc_id, name, key_type_id, val_type_id, lcpl_id, mcpl_id,
-                       mapl_id);
+      map_id = H5Mcreate(loc_id, name, key_type_id, val_type_id, lcpl_id,
+                         mcpl_id, mapl_id);
+    io_time += (MPI_Wtime() - t);
+    return map_id;
   }
 
   inline herr_t H5Mput_wrap(hid_t map_id, hid_t key_mem_type_id,
                             const void *key, hid_t val_mem_type_id,
                             const void *value, hid_t dxpl_id, hid_t es_id) {
+    herr_t err;
+    double t = MPI_Wtime();
     if (async)
-      return H5Mput_async(map_id, key_mem_type_id, key, val_mem_type_id, value,
-                          dxpl_id, es_id);
+      err = H5Mput_async(map_id, key_mem_type_id, key, val_mem_type_id, value,
+                         dxpl_id, es_id);
     else
-      return H5Mput(map_id, key_mem_type_id, key, val_mem_type_id, value,
-                    dxpl_id);
+      err =
+          H5Mput(map_id, key_mem_type_id, key, val_mem_type_id, value, dxpl_id);
+    io_time += (MPI_Wtime() - t);
+    return err;
   }
 
   inline herr_t H5Mclose_wrap(hid_t map_id, hid_t es_id) {
+    herr_t err;
+    double t = MPI_Wtime();
     if (async)
-      return H5Mclose_async(map_id, es_id);
+      err = H5Mclose_async(map_id, es_id);
     else
-      return H5Mclose(map_id);
+      err = H5Mclose(map_id);
+    io_time += (MPI_Wtime() - t);
+    return err;
   }
 
-  inline void asyncWait(hid_t es_id) {
+  inline void asyncWait(hid_t es_id, uint64_t timeout) {
     size_t num_in_progress = 0;
     hbool_t err_occurred = 0;
+    double t = MPI_Wtime();
 
     /* check if all operations in event set have completed */
-    H5ESwait(es_id, H5ES_WAIT_FOREVER, &num_in_progress, &err_occurred);
-    if (num_in_progress || err_occurred) {
+    H5ESwait(es_id, timeout, &num_in_progress, &err_occurred);
+    if (err_occurred || ((timeout == H5ES_WAIT_FOREVER) && num_in_progress)) {
       ERROR(("Failed to complete field async I/O \n"));
     }
+    io_time += (MPI_Wtime() - t);
   }
 
 public:
@@ -628,8 +673,21 @@ public:
 #    ifdef HAS_FIELD_COMP
     temp_buf_index = 0;
 
-    field_t *field_buf = (field_t *)malloc(sizeof(field_t) * (grid->nx) *
-                                           (grid->ny) * (grid->nz));
+    dset_id = H5Dcreate_wrap(group_id, "field", field_type_id, filespace,
+                             H5P_DEFAULT, dcpl_id, H5P_DEFAULT, es_field);
+    H5Sselect_hyperslab(filespace, H5S_SELECT_SET, global_offset, NULL,
+                        global_count, NULL);
+
+    if (async) {
+      asyncWait(es_field, H5ES_WAIT_FOREVER);
+    }
+
+    if (field_buf)
+      free(field_buf);
+
+    field_buf = (field_t *)malloc(sizeof(field_t) * (grid->nx) * (grid->ny) *
+                                  (grid->nz));
+
     for (int i(1); i < grid->nx + 1; i++) {
       for (int j(1); j < grid->ny + 1; j++) {
         for (int k(1); k < grid->nz + 1; k++) {
@@ -637,14 +695,6 @@ public:
           temp_buf_index++;
         }
       }
-    }
-    dset_id = H5Dcreate_wrap(group_id, "field", field_type_id, filespace,
-                             H5P_DEFAULT, dcpl_id, H5P_DEFAULT, es_field);
-    H5Sselect_hyperslab(filespace, H5S_SELECT_SET, global_offset, NULL,
-                        global_count, NULL);
-
-    if (async) {
-      asyncWait(es_field);
     }
 
     H5Dwrite_wrap(dset_id, field_type_id, memspace, filespace, plist_id,
@@ -851,18 +901,6 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     // if(!file_exist_flag)
     H5Gclose_wrap(group_id, es_field);
     H5Fclose_wrap(file_id, es_field);
-
-    if (async) {
-      asyncWait(es_field);
-    }
-
-#  ifdef HAS_FIELD_MAP
-
-#  else
-#    ifdef HAS_FIELD_COMP
-    free(field_buf);
-#    endif // HAS_FIELD_COMP
-#  endif
 
     // io_log("TimeHDF5Close: " << uptime() - el3 << " s");
 
@@ -1130,7 +1168,7 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
                        H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT, es_particle);
 
     if (async) {
-      asyncWait(es_particle);
+      asyncWait(es_particle, H5ES_WAIT_FOREVER);
     }
 
     H5Dwrite_wrap(dset_id, particle_type_id, memspace, filespace, io_plist_id,
@@ -1188,7 +1226,7 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 #  endif // H5_ASYNC
 
     if (async) {
-      asyncWait(es_particle);
+      asyncWait(es_particle, H5ES_WAIT_FOREVER);
     }
 
     // io_log("TimeHDF5Close: " << uptime() - el3 << " s");
@@ -1376,8 +1414,21 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     hsize_t temp_buf_index;
     hid_t dset_id;
 #    ifdef HAS_HYDRO_COMP
-    hydro_t *hydro_buf = (hydro_t *)malloc(sizeof(hydro_t) * (grid->nx) *
-                                           (grid->ny) * (grid->nz));
+    dset_id = H5Dcreate_wrap(group_id, "hydro", hydro_type_id, filespace,
+                             H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT, es_hydro);
+    H5Sselect_hyperslab(filespace, H5S_SELECT_SET, global_offset, NULL,
+                        global_count, NULL);
+
+    if (async) {
+      asyncWait(es_hydro, H5ES_WAIT_FOREVER);
+    }
+
+    if (hydro_buf)
+      free(hydro_buf);
+
+    hydro_buf = (hydro_t *)malloc(sizeof(hydro_t) * (grid->nx) * (grid->ny) *
+                                  (grid->nz));
+
     temp_buf_index = 0;
     for (int i(1); i < grid->nx + 1; i++) {
       for (int j(1); j < grid->ny + 1; j++) {
@@ -1386,14 +1437,6 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
           temp_buf_index = temp_buf_index + 1;
         }
       }
-    }
-    dset_id = H5Dcreate_wrap(group_id, "hydro", hydro_type_id, filespace,
-                             H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT, es_hydro);
-    H5Sselect_hyperslab(filespace, H5S_SELECT_SET, global_offset, NULL,
-                        global_count, NULL);
-
-    if (async) {
-      asyncWait(es_hydro);
     }
 
     H5Dwrite_wrap(dset_id, hydro_type_id, memspace, filespace, plist_id,
@@ -1468,18 +1511,6 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 
     H5Gclose_wrap(group_id, es_hydro);
     H5Fclose_wrap(file_id, es_hydro);
-
-    if (async) {
-      asyncWait(es_hydro);
-    }
-
-#  ifdef HAS_HYDRO_MAP
-
-#  else
-#    ifdef HAS_HYDRO_COMP
-    free(hydro_buf);
-#    endif
-#  endif
 
     // el3 = uptime() - el3;
     // io_log("TimeHDF5Close: " << el3 << " s");
