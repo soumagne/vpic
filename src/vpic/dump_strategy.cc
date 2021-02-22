@@ -170,26 +170,37 @@ HDF5Dump::HDF5Dump(int _rank, int _nproc) : Dump_Strategy(_rank, _nproc) {
 #ifdef HAS_PARTICLE_COMP
     particle_type_id = H5Tcreate_particle();
 #endif
-#ifdef HAS_EXPLICIT_ASYNC
-    es_field = H5EScreate();
-    es_hydro = H5EScreate();
-    es_particle = H5EScreate();
-#else
-    es_field = es_hydro = es_particle = H5I_INVALID_HID;
-#endif
+
+    char *env_async = getenv("VPIC_ASYNC");
+    async = (env_async) ? atoi(env_async) : 0;
+    std::cout << "--- Asynchronous I/O: " << async << std::endl;
+
+    if (async) {
+        es_field = H5EScreate();
+        es_hydro = H5EScreate();
+        es_particle = H5EScreate();
+    } else
+        es_field = es_hydro = es_particle = H5I_INVALID_HID;
+
     char *env_fprefix = getenv("VPIC_FILE_PREFIX");
     fprefix = (env_fprefix) ? env_fprefix : "";
+    std::cout << "--- Using file prefix: " << fprefix << std::endl;
 
     char *env_dump_dir = getenv("VPIC_DUMP_DIR");
     dump_dir = (env_dump_dir) ? env_dump_dir : ".";
+    std::cout << "--- Using dump dir: " << dump_dir << std::endl;
+
+    char *env_indep_meta = getenv("VPIC_INDEP_META");
+    indep_meta = (env_indep_meta) ? atoi(env_indep_meta) : 0;
+    std::cout << "--- Independent metadata: " << indep_meta << std::endl;
 }
 
 HDF5Dump::~HDF5Dump() {
-#ifdef HAS_EXPLICIT_ASYNC
-    H5ESclose(es_field);
-    H5ESclose(es_hydro);
-    H5ESclose(es_particle);
-#endif
+    if (async) {
+        H5ESclose(es_field);
+        H5ESclose(es_hydro);
+        H5ESclose(es_particle);
+    }
 
 #ifdef HAS_FIELD_COMP
     H5Tclose(field_type_id);

@@ -25,8 +25,6 @@
 
 //#define HAS_INDEPENDENT_IO 1
 
-// #define HAS_EXPLICIT_ASYNC 1
-
 #include <cassert>
 #include <mpi.h> // TODO: it would be good if this didn't have to know about MPI
 
@@ -44,6 +42,9 @@
 #ifdef VPIC_ENABLE_HDF5
 #  include "hdf5.h"             // from the lib
 #  include "hdf5_header_info.h" // from vpic
+#  ifdef HAS_DAOS_VOL_EXT
+#    include "daos_vol_public.h"
+#  endif
 #endif
 
 #ifdef VPIC_ENABLE_OPENPMD
@@ -145,106 +146,6 @@
     H5Sclose(dataspace_id);                                                    \
     H5Dclose(dset_id);                                                         \
   }
-
-static inline hid_t H5Fcreate_wrap(const char *filename, unsigned flags,
-                                   hid_t fcpl_id, hid_t fapl_id, hid_t es_id) {
-#ifdef HAS_EXPLICIT_ASYNC
-  return H5Fcreate_async(filename, flags, fcpl_id, fapl_id, es_id);
-#else
-  return H5Fcreate(filename, flags, fcpl_id, fapl_id);
-#endif
-}
-
-static inline herr_t H5Fclose_wrap(hid_t file_id, hid_t es_id) {
-#ifdef HAS_EXPLICIT_ASYNC
-  return H5Fclose_async(file_id, es_id);
-#else
-  return H5Fclose(file_id);
-#endif
-}
-
-static inline hid_t H5Gcreate_wrap(hid_t loc_id, const char *name,
-                                   hid_t lcpl_id, hid_t gcpl_id, hid_t gapl_id,
-                                   hid_t es_id) {
-#ifdef HAS_EXPLICIT_ASYNC
-  return H5Gcreate_async(loc_id, name, lcpl_id, gcpl_id, gapl_id, es_id);
-#else
-  return H5Gcreate2(loc_id, name, lcpl_id, gcpl_id, gapl_id);
-#endif
-}
-
-static inline herr_t H5Gclose_wrap(hid_t group_id, hid_t es_id) {
-#ifdef HAS_EXPLICIT_ASYNC
-  return H5Gclose_async(group_id, es_id);
-#else
-  return H5Gclose(group_id);
-#endif
-}
-
-static inline hid_t H5Dcreate_wrap(hid_t loc_id, const char *name,
-                                   hid_t type_id, hid_t space_id, hid_t lcpl_id,
-                                   hid_t dcpl_id, hid_t dapl_id, hid_t es_id) {
-#ifdef HAS_EXPLICIT_ASYNC
-  return H5Dcreate_async(loc_id, name, type_id, space_id, lcpl_id, dcpl_id,
-                         dapl_id, es_id);
-#else
-  return H5Dcreate(loc_id, name, type_id, space_id, lcpl_id, dcpl_id, dapl_id);
-#endif
-}
-
-static inline herr_t H5Dwrite_wrap(hid_t dset_id, hid_t mem_type_id,
-                                   hid_t mem_space_id, hid_t file_space_id,
-                                   hid_t dxpl_id, const void *buf,
-                                   hid_t es_id) {
-#ifdef HAS_EXPLICIT_ASYNC
-  return H5Dwrite_async(dset_id, mem_type_id, mem_space_id, file_space_id,
-                        dxpl_id, buf, es_id);
-#else
-  return H5Dwrite(dset_id, mem_type_id, mem_space_id, file_space_id, dxpl_id,
-                  buf);
-#endif
-}
-
-static inline herr_t H5Dclose_wrap(hid_t dset_id, hid_t es_id) {
-#ifdef HAS_EXPLICIT_ASYNC
-  return H5Dclose_async(dset_id, es_id);
-#else
-  return H5Dclose(dset_id);
-#endif
-}
-
-static inline hid_t H5Mcreate_wrap(hid_t loc_id, const char *name,
-                                   hid_t key_type_id, hid_t val_type_id,
-                                   hid_t lcpl_id, hid_t mcpl_id, hid_t mapl_id,
-                                   hid_t es_id) {
-#ifdef HAS_EXPLICIT_ASYNC
-  return H5Mcreate_async(loc_id, name, key_type_id, val_type_id, lcpl_id,
-                         mcpl_id, mapl_id, es_id);
-#else
-  return H5Mcreate(loc_id, name, key_type_id, val_type_id, lcpl_id, mcpl_id,
-                   mapl_id);
-#endif
-}
-
-static inline herr_t H5Mput_wrap(hid_t map_id, hid_t key_mem_type_id,
-                                 const void *key, hid_t val_mem_type_id,
-                                 const void *value, hid_t dxpl_id,
-                                 hid_t es_id) {
-#ifdef HAS_EXPLICIT_ASYNC
-  return H5Mput_async(map_id, key_mem_type_id, key, val_mem_type_id, value,
-                      dxpl_id, es_id);
-#else
-  return H5Mput(map_id, key_mem_type_id, key, val_mem_type_id, value, dxpl_id);
-#endif
-}
-
-static inline herr_t H5Mclose_wrap(hid_t map_id, hid_t es_id) {
-#ifdef HAS_EXPLICIT_ASYNC
-  return H5Mclose_async(map_id, es_id);
-#else
-  return H5Mclose(map_id);
-#endif
-}
 
 // Runtime inheritance is obviously not very "VPIC like", as we will [probably]
 // incur a penalty for the vtable lookup, but given we're about to do IO this
@@ -383,10 +284,111 @@ private:
   hid_t es_field, es_hydro, es_particle;
   const char *fprefix;
   const char *dump_dir;
+  int indep_meta;
+  int async;
 
   hid_t H5Tcreate_fields(void);
   hid_t H5Tcreate_hydro(void);
   hid_t H5Tcreate_particle(void);
+
+  inline hid_t H5Fcreate_wrap(const char *filename, unsigned flags,
+                              hid_t fcpl_id, hid_t fapl_id, hid_t es_id) {
+    if (async)
+      return H5Fcreate_async(filename, flags, fcpl_id, fapl_id, es_id);
+    else
+      return H5Fcreate(filename, flags, fcpl_id, fapl_id);
+  }
+
+  inline herr_t H5Fclose_wrap(hid_t file_id, hid_t es_id) {
+    if (async)
+      return H5Fclose_async(file_id, es_id);
+    else
+      return H5Fclose(file_id);
+  }
+
+  inline hid_t H5Gcreate_wrap(hid_t loc_id, const char *name, hid_t lcpl_id,
+                              hid_t gcpl_id, hid_t gapl_id, hid_t es_id) {
+    if (async)
+      return H5Gcreate_async(loc_id, name, lcpl_id, gcpl_id, gapl_id, es_id);
+    else
+      return H5Gcreate2(loc_id, name, lcpl_id, gcpl_id, gapl_id);
+  }
+
+  inline herr_t H5Gclose_wrap(hid_t group_id, hid_t es_id) {
+    if (async)
+      return H5Gclose_async(group_id, es_id);
+    else
+      return H5Gclose(group_id);
+  }
+
+  inline hid_t H5Dcreate_wrap(hid_t loc_id, const char *name, hid_t type_id,
+                              hid_t space_id, hid_t lcpl_id, hid_t dcpl_id,
+                              hid_t dapl_id, hid_t es_id) {
+    if (async)
+      return H5Dcreate_async(loc_id, name, type_id, space_id, lcpl_id, dcpl_id,
+                             dapl_id, es_id);
+    else
+      return H5Dcreate(loc_id, name, type_id, space_id, lcpl_id, dcpl_id,
+                       dapl_id);
+  }
+
+  inline herr_t H5Dwrite_wrap(hid_t dset_id, hid_t mem_type_id,
+                              hid_t mem_space_id, hid_t file_space_id,
+                              hid_t dxpl_id, const void *buf, hid_t es_id) {
+    if (async)
+      return H5Dwrite_async(dset_id, mem_type_id, mem_space_id, file_space_id,
+                            dxpl_id, buf, es_id);
+    else
+      return H5Dwrite(dset_id, mem_type_id, mem_space_id, file_space_id,
+                      dxpl_id, buf);
+  }
+
+  inline herr_t H5Dclose_wrap(hid_t dset_id, hid_t es_id) {
+    if (async)
+      return H5Dclose_async(dset_id, es_id);
+    else
+      return H5Dclose(dset_id);
+  }
+
+  inline hid_t H5Mcreate_wrap(hid_t loc_id, const char *name, hid_t key_type_id,
+                              hid_t val_type_id, hid_t lcpl_id, hid_t mcpl_id,
+                              hid_t mapl_id, hid_t es_id) {
+    if (async)
+      return H5Mcreate_async(loc_id, name, key_type_id, val_type_id, lcpl_id,
+                             mcpl_id, mapl_id, es_id);
+    else
+      return H5Mcreate(loc_id, name, key_type_id, val_type_id, lcpl_id, mcpl_id,
+                       mapl_id);
+  }
+
+  inline herr_t H5Mput_wrap(hid_t map_id, hid_t key_mem_type_id,
+                            const void *key, hid_t val_mem_type_id,
+                            const void *value, hid_t dxpl_id, hid_t es_id) {
+    if (async)
+      return H5Mput_async(map_id, key_mem_type_id, key, val_mem_type_id, value,
+                          dxpl_id, es_id);
+    else
+      return H5Mput(map_id, key_mem_type_id, key, val_mem_type_id, value,
+                    dxpl_id);
+  }
+
+  inline herr_t H5Mclose_wrap(hid_t map_id, hid_t es_id) {
+    if (async)
+      return H5Mclose_async(map_id, es_id);
+    else
+      return H5Mclose(map_id);
+  }
+
+  inline void asyncWait(hid_t es_id) {
+    size_t num_in_progress = 0;
+    hbool_t err_occurred = 0;
+
+    /* check if all operations in event set have completed */
+    H5ESwait(es_id, H5ES_WAIT_FOREVER, &num_in_progress, &err_occurred);
+    if (num_in_progress || err_occurred) {
+      ERROR(("Failed to complete field async I/O \n"));
+    }
+  }
 
 public:
   HDF5Dump(int _rank, int _nproc);
@@ -474,11 +476,22 @@ public:
     H5Pset_coll_metadata_write(plist_id, TRUE);
 #  endif // METADATA_COLL_WRITE
 
+#  ifdef HAS_DAOS_VOL_EXT
+    if (indep_meta)
+      H5daos_set_all_ind_metadata_ops(plist_id, 1);
+#  endif
+
     hid_t file_id =
         H5Fcreate_wrap(fname, H5F_ACC_TRUNC, H5P_DEFAULT, plist_id, es_field);
     H5Pclose(plist_id);
 
-    sprintf(fname, "Timestep_%d", step);
+#  ifdef HAS_DAOS_VOL_EXT
+    if (indep_meta)
+      sprintf(fname, "Timestep_%d_%d", step, rank);
+    else
+#  endif
+      sprintf(fname, "Timestep_%d", step);
+
     hid_t group_id = H5Gcreate_wrap(file_id, fname, H5P_DEFAULT, H5P_DEFAULT,
                                     H5P_DEFAULT, es_field);
 
@@ -629,6 +642,11 @@ public:
                              H5P_DEFAULT, dcpl_id, H5P_DEFAULT, es_field);
     H5Sselect_hyperslab(filespace, H5S_SELECT_SET, global_offset, NULL,
                         global_count, NULL);
+
+    if (async) {
+      asyncWait(es_field);
+    }
+
     H5Dwrite_wrap(dset_id, field_type_id, memspace, filespace, plist_id,
                   field_buf, es_field);
     H5Dclose_wrap(dset_id, es_field);
@@ -834,16 +852,9 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     H5Gclose_wrap(group_id, es_field);
     H5Fclose_wrap(file_id, es_field);
 
-#  ifdef HAS_EXPLICIT_ASYNC
-    size_t num_in_progress = 0;
-    hbool_t err_occurred = 0;
-
-    /* check if all operations in event set have completed */
-    H5ESwait(es_field, H5ES_WAIT_FOREVER, &num_in_progress, &err_occurred);
-    if (num_in_progress || err_occurred) {
-      ERROR(("Failed to complete field async I/O \n"));
+    if (async) {
+      asyncWait(es_field);
     }
-#  endif // HAS_EXPLICIT_ASYNC
 
 #  ifdef HAS_FIELD_MAP
 
@@ -1015,7 +1026,6 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
             step, mpi_rank);
 #  endif // N_FILE_N_PROCESS
 
-    sprintf(group_name, "/Timestep_%d", step);
     // double el1 = uptime();
 
     hid_t file_plist_id = H5Pcreate(H5P_FILE_ACCESS);
@@ -1031,9 +1041,21 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     assert(H5Pset_vol_async(file_plist_id));
 #  endif // H5_ASYNC
 
+#  ifdef HAS_DAOS_VOL_EXT
+    if (indep_meta)
+      H5daos_set_all_ind_metadata_ops(file_plist_id, 1);
+#  endif
+
     hid_t file_id = H5Fcreate_wrap(fname, H5F_ACC_TRUNC, H5P_DEFAULT,
                                    file_plist_id, es_particle);
     H5Pclose(file_plist_id);
+
+#  ifdef HAS_DAOS_VOL_EXT
+    if (indep_meta)
+      sprintf(group_name, "/Timestep_%d_%d", step, rank);
+    else
+#  endif
+      sprintf(group_name, "/Timestep_%d", step);
 
     hid_t group_id = H5Gcreate_wrap(file_id, group_name, H5P_DEFAULT,
                                     H5P_DEFAULT, H5P_DEFAULT, es_particle);
@@ -1106,6 +1128,11 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     hid_t dset_id =
         H5Dcreate_wrap(group_id, "particle", particle_type_id, filespace,
                        H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT, es_particle);
+
+    if (async) {
+      asyncWait(es_particle);
+    }
+
     H5Dwrite_wrap(dset_id, particle_type_id, memspace, filespace, io_plist_id,
                   sp->p, es_particle);
     H5Dclose_wrap(dset_id, es_particle);
@@ -1160,16 +1187,9 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     H5VLasync_finalize();
 #  endif // H5_ASYNC
 
-#  ifdef HAS_EXPLICIT_ASYNC
-    size_t num_in_progress = 0;
-    hbool_t err_occurred = 0;
-
-    /* check if all operations in event set have completed */
-    H5ESwait(es_particle, H5ES_WAIT_FOREVER, &num_in_progress, &err_occurred);
-    if (num_in_progress || err_occurred) {
-      ERROR(("Failed to complete field async I/O \n"));
+    if (async) {
+      asyncWait(es_particle);
     }
-#  endif // HAS_EXPLICIT_ASYNC
 
     // io_log("TimeHDF5Close: " << uptime() - el3 << " s");
     double t_end = uptime();
@@ -1234,11 +1254,22 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 
     H5Pset_fapl_mpio(plist_id, MPI_COMM_WORLD, MPI_INFO_NULL);
 
+#  ifdef HAS_DAOS_VOL_EXT
+    if (indep_meta)
+      H5daos_set_all_ind_metadata_ops(plist_id, 1);
+#  endif
+
     hid_t file_id =
         H5Fcreate_wrap(hname, H5F_ACC_TRUNC, H5P_DEFAULT, plist_id, es_hydro);
     H5Pclose(plist_id);
 
-    sprintf(hname, "Timestep_%d", step);
+#  ifdef HAS_DAOS_VOL_EXT
+    if (indep_meta)
+      sprintf(hname, "Timestep_%d_%d", step, rank);
+    else
+#  endif
+      sprintf(hname, "Timestep_%d", step);
+
     hid_t group_id = H5Gcreate_wrap(file_id, hname, H5P_DEFAULT, H5P_DEFAULT,
                                     H5P_DEFAULT, es_hydro);
 
@@ -1360,6 +1391,11 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
                              H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT, es_hydro);
     H5Sselect_hyperslab(filespace, H5S_SELECT_SET, global_offset, NULL,
                         global_count, NULL);
+
+    if (async) {
+      asyncWait(es_hydro);
+    }
+
     H5Dwrite_wrap(dset_id, hydro_type_id, memspace, filespace, plist_id,
                   hydro_buf, es_hydro);
     H5Dclose_wrap(dset_id, es_hydro);
@@ -1433,16 +1469,9 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     H5Gclose_wrap(group_id, es_hydro);
     H5Fclose_wrap(file_id, es_hydro);
 
-#  ifdef HAS_EXPLICIT_ASYNC
-    size_t num_in_progress = 0;
-    hbool_t err_occurred = 0;
-
-    /* check if all operations in event set have completed */
-    H5ESwait(es_hydro, H5ES_WAIT_FOREVER, &num_in_progress, &err_occurred);
-    if (num_in_progress || err_occurred) {
-      ERROR(("Failed to complete field async I/O \n"));
+    if (async) {
+      asyncWait(es_hydro);
     }
-#  endif
 
 #  ifdef HAS_HYDRO_MAP
 

@@ -317,11 +317,15 @@ if(USE_HDF5)
     set(VPIC_CXX_LIBRARIES "${VPIC_CXX_LIBRARIES} -I${HDF5_INCLUDE_DIRS} ${string_libraries}")
     include_directories(${HDF5_INCLUDE_DIRS})
 
-    option(USE_EXPLICIT_ASYNC "Use HDF5 asynchronous I/O" OFF)
-    if (USE_EXPLICIT_ASYNC)
-        add_definitions(-DHAS_EXPLICIT_ASYNC)
+    option(USE_DAOS_VOL_EXT "Use DAOS VOL extensions" OFF)
+    if (USE_DAOS_VOL_EXT)
+      find_package(hdf5_vol_daos NO_MODULE REQUIRED)
+      add_definitions(-DHAS_DAOS_VOL_EXT)
+      get_target_property(HDF5_VOL_DAOS_LIBRARY hdf5_vol_daos IMPORTED_LOCATION_RELWITHDEBINFO)
+      set(VPIC_CXX_LIBRARIES "${VPIC_CXX_LIBRARIES} ${HDF5_VOL_DAOS_LIBRARY}")
+      set(HDF5_C_LIBRARIES ${HDF5_C_LIBRARIES} ${HDF5_VOL_DAOS_LIBRARY})
+      message(${HDF5_VOL_DAOS_LIBRARY})
     endif()
-
 endif(USE_HDF5)
 
 #------------------------------------------------------------------------------#
