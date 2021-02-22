@@ -10,13 +10,13 @@
 #ifdef H5_ASYNC
 #  include "h5_vol_external_async_native.h"
 #endif // H5_ASYNC
-//#define CHUNK_FLAG 1
+// #define CHUNK_FLAG 1
 
 //#define METADATA_COLL_WRITE 1
 //#define TRUE 1
 
 #define HAS_FIELD_COMP 1
-#define HAS_PARTICLE_COMP 1
+// #define HAS_PARTICLE_COMP 1
 #define HAS_HYDRO_COMP 1
 
 // #define HAS_FIELD_MAP 1
@@ -427,6 +427,9 @@ private:
     hbool_t err_occurred = 0;
     double t = MPI_Wtime();
 
+    if (rank == 0)
+      std::cout << "Here in wait" << std::endl;
+
     /* check if all operations in event set have completed */
     H5ESwait(es_id, timeout, &num_in_progress, &err_occurred);
     if (err_occurred || ((timeout == H5ES_WAIT_FOREVER) && num_in_progress)) {
@@ -461,7 +464,7 @@ public:
     int mpi_size, mpi_rank;
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    // double t_start = uptime();
+    double t_start = uptime();
 
 #  ifdef DUMP_INFO_DEBUG
     printf("MPI rank = %d, size = %d \n", mpi_rank, mpi_size);
@@ -654,9 +657,9 @@ public:
 #    endif // DUMP_INFO_DEBUG
 
 #    ifdef CHUNK_FLAG
-    hsize_t chunk_dims[3] = {288, 24, 24};
+    // hsize_t chunk_dims[3] = {288, 24, 24};
     hid_t dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
-    // hsize_t chunk_dims[3] = {grid->nx, grid->ny, grid->nz};
+    hsize_t chunk_dims[3] = {grid->nx, grid->ny, grid->nz};
 
     H5Pset_chunk(dcpl_id, 3, chunk_dims);
     if (!mpi_rank)
@@ -679,7 +682,11 @@ public:
                         global_count, NULL);
 
     if (async) {
+      if (rank == 0)
+        std::cout << "About to wait" << std::endl;
       asyncWait(es_field, H5ES_WAIT_FOREVER);
+      if (rank == 0)
+        std::cout << "Exiting wait" << std::endl;
     }
 
     if (field_buf)
@@ -966,10 +973,10 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
       field_tframe++;
     }
 #  endif // OUTPUT_XDMF
-    // double t_end = uptime();
-    // if (!rank)
-    //   printf("Total dump field time for %d fields: %lf\n",
-    //          (grid->nx) * (grid->ny) * (grid->nz), t_end - t_start);
+    double t_end = uptime();
+    if (!rank)
+      printf("Total dump field time for %d fields: %lf\n",
+             (grid->nx) * (grid->ny) * (grid->nz), t_end - t_start);
   }
   /**
    * @brief dump_particles to the HDF5 file
@@ -990,7 +997,6 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     int mpi_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
     // double dump_particles_uptime = uptime();
-    // double t_start = uptime();
     // time_t seconds = time(NULL);
     // printf("Atrank = %d, file_index = %d, dump_particles_uptime = %f,
     // epoch_seconds = %ld  \n ", mpi_rank, file_index, dump_particles_uptime,
@@ -1066,6 +1072,8 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 
     // double el1 = uptime();
 
+    // double t_start = uptime();
+
     hid_t file_plist_id = H5Pcreate(H5P_FILE_ACCESS);
 
 #  ifndef N_FILE_N_PROCESS
@@ -1095,8 +1103,16 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 #  endif
       sprintf(group_name, "/Timestep_%d", step);
 
+double t_group_create1 = MPI_Wtime();
+
     hid_t group_id = H5Gcreate_wrap(file_id, group_name, H5P_DEFAULT,
                                     H5P_DEFAULT, H5P_DEFAULT, es_particle);
+
+double t_group_create2 = MPI_Wtime();
+    if (!rank)
+      printf("Time for group create operation: %lf\n",
+      t_group_create2 - t_group_create1);
+
 
     // io_log("TimeHDF5Open:  " << uptime() - el1
     //  << " s"); // Easy to handle results for scripts
@@ -1140,7 +1156,7 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     }
     H5Pset_dxpl_mpio(io_plist_id, H5FD_MPIO_INDEPENDENT);
 #      else  // HAS_INDEPENDENT_IO
-    H5Pset_dxpl_mpio(io_plist_id, H5FD_MPIO_COLLECTIVE);
+    // H5Pset_dxpl_mpio(io_plist_id, H5FD_MPIO_COLLECTIVE);
 #      endif // HAS_INDEPENDENT_IO
 #    endif   // N_FILE_N_PROCESS
 
@@ -1156,8 +1172,10 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     memspace_count_temp = numparticles * 8;
     memspace = H5Screate_simple(1, &memspace_count_temp, NULL);
     hsize_t memspace_start = 0, memspace_stride = 8, memspace_count = np_local;
+    // H5Sselect_hyperslab(memspace, H5S_SELECT_SET, &memspace_start,
+    //                     &memspace_stride, &memspace_count, NULL);
     H5Sselect_hyperslab(memspace, H5S_SELECT_SET, &memspace_start,
-                        &memspace_stride, &memspace_count, NULL);
+                        NULL, &memspace_count, NULL);
 #    endif // HAS_PARTICLE_COMP
 
     // MPI_Info_set(info, "romio_cb_write", "disable");
@@ -1167,16 +1185,12 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
         H5Dcreate_wrap(group_id, "particle", particle_type_id, filespace,
                        H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT, es_particle);
 
-    if (async) {
-      // asyncWait(es_particle, H5ES_WAIT_FOREVER);
-    }
-
     H5Dwrite_wrap(dset_id, particle_type_id, memspace, filespace, io_plist_id,
                   sp->p, es_particle);
     H5Dclose_wrap(dset_id, es_particle);
 #    else // HAS_PARTICLE_COMP
-    Pf = (float *)sp->p;
-    Pi = (int *)sp->p;
+    float *Pf = (float *)sp->p;
+    int *Pi = (int *)sp->p;
 
 #      ifdef TEST_MPIIO
     // Here we don't use the stripe but just for performance test
@@ -1200,20 +1214,70 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 #        endif // N_FILE_N_PROCESS
     // if(!mpi_rank )
     // io_log("++Particle Starting to write ) ");
-    WRITE_H5_FILE(group_id, Pf, H5T_NATIVE_FLOAT, "dX")
-    WRITE_H5_FILE(group_id, Pf + 1, H5T_NATIVE_FLOAT, "dY")
-    WRITE_H5_FILE(group_id, Pf + 2, H5T_NATIVE_FLOAT, "dZ")
-    WRITE_H5_FILE(group_id, Pi + 3, H5T_NATIVE_INT, "i")
-    WRITE_H5_FILE(group_id, Pf + 4, H5T_NATIVE_FLOAT, "ux")
-    WRITE_H5_FILE(group_id, Pf + 5, H5T_NATIVE_FLOAT, "uy")
-    WRITE_H5_FILE(group_id, Pf + 6, H5T_NATIVE_FLOAT, "uz")
-    WRITE_H5_FILE(group_id, Pf + 7, H5T_NATIVE_FLOAT, "q")
-#      endif   // TEST_MPIIO
-#    endif     // HAS_PARTICLE_COMP
+
+    hid_t dx_id =
+        H5Dcreate_wrap(group_id, "dX", H5T_NATIVE_FLOAT, filespace, H5P_DEFAULT,
+                       H5P_DEFAULT, H5P_DEFAULT, es_particle);
+    hid_t dy_id =
+        H5Dcreate_wrap(group_id, "dY", H5T_NATIVE_FLOAT, filespace, H5P_DEFAULT,
+                       H5P_DEFAULT, H5P_DEFAULT, es_particle);
+    hid_t dz_id =
+        H5Dcreate_wrap(group_id, "dZ", H5T_NATIVE_FLOAT, filespace, H5P_DEFAULT,
+                       H5P_DEFAULT, H5P_DEFAULT, es_particle);
+    hid_t i_id =
+        H5Dcreate_wrap(group_id, "i", H5T_NATIVE_INT, filespace, H5P_DEFAULT,
+                       H5P_DEFAULT, H5P_DEFAULT, es_particle);
+    hid_t ux_id =
+        H5Dcreate_wrap(group_id, "ux", H5T_NATIVE_FLOAT, filespace, H5P_DEFAULT,
+                       H5P_DEFAULT, H5P_DEFAULT, es_particle);
+    hid_t uy_id =
+        H5Dcreate_wrap(group_id, "uy", H5T_NATIVE_FLOAT, filespace, H5P_DEFAULT,
+                       H5P_DEFAULT, H5P_DEFAULT, es_particle);
+    hid_t uz_id =
+        H5Dcreate_wrap(group_id, "uz", H5T_NATIVE_FLOAT, filespace, H5P_DEFAULT,
+                       H5P_DEFAULT, H5P_DEFAULT, es_particle);
+    hid_t q_id =
+        H5Dcreate_wrap(group_id, "q", H5T_NATIVE_FLOAT, filespace, H5P_DEFAULT,
+                       H5P_DEFAULT, H5P_DEFAULT, es_particle);
+
+    if (async) {
+      asyncWait(es_particle, H5ES_WAIT_FOREVER);
+    }
+
+    double t_start = uptime();
+
+    H5Dwrite_wrap(dx_id, H5T_NATIVE_FLOAT, memspace, filespace, io_plist_id, Pf,
+                  es_particle);
+    H5Dwrite_wrap(dy_id, H5T_NATIVE_FLOAT, memspace, filespace, io_plist_id,
+                  Pf + 1, es_particle);
+    H5Dwrite_wrap(dz_id, H5T_NATIVE_FLOAT, memspace, filespace, io_plist_id,
+                  Pf + 2, es_particle);
+    H5Dwrite_wrap(i_id, H5T_NATIVE_FLOAT, memspace, filespace, io_plist_id,
+                  Pf + 3, es_particle);
+    H5Dwrite_wrap(ux_id, H5T_NATIVE_FLOAT, memspace, filespace, io_plist_id,
+                  Pf + 4, es_particle);
+    H5Dwrite_wrap(uy_id, H5T_NATIVE_FLOAT, memspace, filespace, io_plist_id,
+                  Pf + 5, es_particle);
+    H5Dwrite_wrap(uz_id, H5T_NATIVE_FLOAT, memspace, filespace, io_plist_id,
+                  Pf + 6, es_particle);
+    H5Dwrite_wrap(q_id, H5T_NATIVE_FLOAT, memspace, filespace, io_plist_id,
+                  Pf + 7, es_particle);
+
+    H5Dclose_wrap(dx_id, es_particle);
+    H5Dclose_wrap(dy_id, es_particle);
+    H5Dclose_wrap(dz_id, es_particle);
+    H5Dclose_wrap(i_id, es_particle);
+    H5Dclose_wrap(ux_id, es_particle);
+    H5Dclose_wrap(uy_id, es_particle);
+    H5Dclose_wrap(uz_id, es_particle);
+    H5Dclose_wrap(q_id, es_particle);
+
+#      endif // TEST_MPIIO
+#    endif   // HAS_PARTICLE_COMP
     H5Sclose(memspace);
     H5Sclose(filespace);
     H5Pclose(io_plist_id);
-#  endif       // HAS_PARTICLE_MAP
+#  endif     // HAS_PARTICLE_MAP
 
     // io_log("TimeHDF5Write: " << uptime() - el2 << " s");
     // double el3 = uptime();
@@ -1230,11 +1294,12 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     }
 
     // io_log("TimeHDF5Close: " << uptime() - el3 << " s");
-    // double t_end = uptime();
+    double t_end = uptime();
 
-    // if (!rank)
-    //   printf("Total dump %s particles time for %lld particles: %lf\n", sp->name,
-    //          sp->np, t_end - t_start);
+    if (!rank)
+      printf("(%d) Total dump %s particles time for %lld particles: %lf\n",
+       step, sp->name,
+             sp->np, t_end - t_start);
   }
 
   /**
@@ -1577,10 +1642,10 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
       tframe_map[sp->id]++;
     }
 #  endif // OUTPUT_XDMF
-  //   double t_end = uptime();
-  //   if (!rank)
-  //     printf("Total dump %s hydro time for %d fields: %lf\n", sp->name,
-  //            (grid->nx) * (grid->ny) * (grid->nz), t_end - t_start);
+    //   double t_end = uptime();
+    //   if (!rank)
+    //     printf("Total dump %s hydro time for %d fields: %lf\n", sp->name,
+    //            (grid->nx) * (grid->ny) * (grid->nz), t_end - t_start);
   }
 };
 #endif // VPIC_ENABLE_HDF5
