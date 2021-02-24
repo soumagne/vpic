@@ -1185,8 +1185,17 @@ double t_group_create2 = MPI_Wtime();
         H5Dcreate_wrap(group_id, "particle", particle_type_id, filespace,
                        H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT, es_particle);
 
+    double t_start = uptime();
+
     H5Dwrite_wrap(dset_id, particle_type_id, memspace, filespace, io_plist_id,
                   sp->p, es_particle);
+
+    if (async) {
+      asyncWait(es_particle, H5ES_WAIT_FOREVER);
+    }
+
+    double t_end = uptime();
+
     H5Dclose_wrap(dset_id, es_particle);
 #    else // HAS_PARTICLE_COMP
     float *Pf = (float *)sp->p;
@@ -1244,6 +1253,8 @@ double t_group_create2 = MPI_Wtime();
       asyncWait(es_particle, H5ES_WAIT_FOREVER);
     }
 
+    H5Fflush(file_id, H5F_SCOPE_GLOBAL);
+
     double t_start = uptime();
 
     H5Dwrite_wrap(dx_id, H5T_NATIVE_FLOAT, memspace, filespace, io_plist_id, Pf,
@@ -1266,6 +1277,7 @@ double t_group_create2 = MPI_Wtime();
     if (async) {
       asyncWait(es_particle, H5ES_WAIT_FOREVER);
     }
+    H5Fflush(file_id, H5F_SCOPE_GLOBAL);
 
     double t_end = uptime();
 
