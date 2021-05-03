@@ -1121,15 +1121,14 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 
     {
       hid_t *part_group_ids = NULL;
-      size_t n_groups;
+      size_t n_groups = numparticles;
       long long total_particles;
       hid_t gcpl_id;
 
-      if (indep_meta) {
-        n_groups = numparticles;
-      } else {
-        MPI_Allreduce(&numparticles, &n_groups, 1, MPI_LONG_LONG, MPI_SUM,
-                      MPI_COMM_WORLD);
+      if (!indep_meta) {
+        // MPI_Allreduce(&numparticles, &n_groups, 1, MPI_LONG_LONG, MPI_SUM,
+        //               MPI_COMM_WORLD);
+        MPI_Bcast(&n_groups, 1, MPI_LONG_LONG, 0, MPI_COMM_WORLD);
       }
 
       gcpl_id = H5Pcreate(H5P_GROUP_CREATE);
@@ -1155,10 +1154,14 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
           char part_group_name[64];
           sprintf(part_group_name, "Part_%d", i);
 
+          if (rank == 0 && (i % 10000) == 0)
+              printf(".");
+
           part_group_ids[i] =
               H5Gcreate_wrap(group_id, part_group_name, H5P_DEFAULT,
                              gcpl_id, H5P_DEFAULT, es_particle);
         }
+        printf("\n");
       }
       MPI_Barrier(MPI_COMM_WORLD);
       H5Pclose(gcpl_id);
