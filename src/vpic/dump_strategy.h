@@ -16,7 +16,7 @@
 //#define TRUE 1
 
 #define HAS_FIELD_COMP 1
-// #define HAS_PARTICLE_COMP 1
+#define HAS_PARTICLE_COMP 1
 #define HAS_HYDRO_COMP 1
 
 // #define HAS_FIELD_MAP 1
@@ -704,8 +704,17 @@ public:
       }
     }
 
+    double t_write1 = MPI_Wtime();
+
     H5Dwrite_wrap(dset_id, field_type_id, memspace, filespace, plist_id,
                   field_buf, es_field);
+
+    double t_write2 = MPI_Wtime();
+    if (rank == 0)
+      std::cout << "-- field write time for "
+                << (grid->nx) * (grid->ny) * (grid->nz)
+                << " fields: " << t_write2 - t_write1 << "s" << std::endl;
+
     H5Dclose_wrap(dset_id, es_field);
 #    else  // HAS_FIELD_COMP
     float *temp_buf =
@@ -1103,20 +1112,19 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 #  endif
       sprintf(group_name, "/Timestep_%d", step);
 
-double t_group_create1 = MPI_Wtime();
+    double t_group_create1 = MPI_Wtime();
 
     hid_t group_id = H5Gcreate_wrap(file_id, group_name, H5P_DEFAULT,
                                     H5P_DEFAULT, H5P_DEFAULT, es_particle);
 
-double t_group_create2 = MPI_Wtime();
+    double t_group_create2 = MPI_Wtime();
     if (!rank)
       printf("Time for group create operation: %lf\n",
-      t_group_create2 - t_group_create1);
+             t_group_create2 - t_group_create1);
 
-
-    // io_log("TimeHDF5Open:  " << uptime() - el1
-    //  << " s"); // Easy to handle results for scripts
-    // double el2 = uptime();
+      // io_log("TimeHDF5Open:  " << uptime() - el1
+      //  << " s"); // Easy to handle results for scripts
+      // double el2 = uptime();
 
 #  ifdef HAS_PARTICLE_MAP
     hid_t map_id =
@@ -1174,8 +1182,8 @@ double t_group_create2 = MPI_Wtime();
     hsize_t memspace_start = 0, memspace_stride = 8, memspace_count = np_local;
     // H5Sselect_hyperslab(memspace, H5S_SELECT_SET, &memspace_start,
     //                     &memspace_stride, &memspace_count, NULL);
-    H5Sselect_hyperslab(memspace, H5S_SELECT_SET, &memspace_start,
-                        NULL, &memspace_count, NULL);
+    H5Sselect_hyperslab(memspace, H5S_SELECT_SET, &memspace_start, NULL,
+                        &memspace_count, NULL);
 #    endif // HAS_PARTICLE_COMP
 
     // MPI_Info_set(info, "romio_cb_write", "disable");
@@ -1184,6 +1192,8 @@ double t_group_create2 = MPI_Wtime();
     hid_t dset_id =
         H5Dcreate_wrap(group_id, "particle", particle_type_id, filespace,
                        H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT, es_particle);
+
+    double t_start = uptime();
 
     H5Dwrite_wrap(dset_id, particle_type_id, memspace, filespace, io_plist_id,
                   sp->p, es_particle);
@@ -1298,8 +1308,7 @@ double t_group_create2 = MPI_Wtime();
 
     if (!rank)
       printf("(%d) Total dump %s particles time for %lld particles: %lf\n",
-       step, sp->name,
-             sp->np, t_end - t_start);
+             step, sp->name, sp->np, t_end - t_start);
   }
 
   /**
@@ -1322,7 +1331,7 @@ double t_group_create2 = MPI_Wtime();
     int mpi_size, mpi_rank;
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    // double t_start = uptime();
+    double t_start = uptime();
 
     if (!sp) {
       ERROR(("Invalid species"));
@@ -1504,8 +1513,17 @@ double t_group_create2 = MPI_Wtime();
       }
     }
 
+    double t_write1 = MPI_Wtime();
+
     H5Dwrite_wrap(dset_id, hydro_type_id, memspace, filespace, plist_id,
                   hydro_buf, es_hydro);
+
+    double t_write2 = MPI_Wtime();
+    if (rank == 0)
+      std::cout << "-- %s hydro write time for "
+                << (grid->nx) * (grid->ny) * (grid->nz)
+                << " fields: " << t_write2 - t_write1 << "s" << std::endl;
+
     H5Dclose_wrap(dset_id, es_hydro);
 #    else
     float *temp_buf =
@@ -1642,10 +1660,10 @@ double t_group_create2 = MPI_Wtime();
       tframe_map[sp->id]++;
     }
 #  endif // OUTPUT_XDMF
-    //   double t_end = uptime();
-    //   if (!rank)
-    //     printf("Total dump %s hydro time for %d fields: %lf\n", sp->name,
-    //            (grid->nx) * (grid->ny) * (grid->nz), t_end - t_start);
+    double t_end = uptime();
+    if (!rank)
+      printf("Total dump %s hydro time for %d fields: %lf\n", sp->name,
+             (grid->nx) * (grid->ny) * (grid->nz), t_end - t_start);
   }
 };
 #endif // VPIC_ENABLE_HDF5
