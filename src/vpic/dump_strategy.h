@@ -1198,6 +1198,8 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 #    ifndef N_FILE_N_PROCESS
     MPI_Allreduce(&numparticles, &total_particles, 1, MPI_LONG_LONG, MPI_SUM,
                   MPI_COMM_WORLD);
+    if (rank == 0)
+        printf("Total number of particles: %zu\n", total_particles);
 #    else  // N_FILE_N_PROCESS
     total_particles = np_local;
 #    endif // N_FILE_N_PROCESS
