@@ -1161,7 +1161,8 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
               H5Gcreate_wrap(group_id, part_group_name, H5P_DEFAULT,
                              gcpl_id, H5P_DEFAULT, es_particle);
         }
-        printf("\n");
+        if (rank == 0)
+            printf("\n");
       }
       MPI_Barrier(MPI_COMM_WORLD);
       H5Pclose(gcpl_id);
