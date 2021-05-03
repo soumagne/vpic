@@ -16,7 +16,7 @@
 //#define TRUE 1
 
 #define HAS_FIELD_COMP 1
-// #define HAS_PARTICLE_COMP 1
+#define HAS_PARTICLE_COMP 1
 #define HAS_HYDRO_COMP 1
 
 // #define HAS_FIELD_MAP 1
@@ -1079,6 +1079,7 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 #  ifndef N_FILE_N_PROCESS
     H5Pset_fapl_mpio(file_plist_id, MPI_COMM_WORLD, MPI_INFO_NULL);
 #  endif // N_FILE_N_PROCESS
+    H5Pset_mpi_params(file_plist_id, MPI_COMM_WORLD, MPI_INFO_NULL);
 
 #  ifdef H5_ASYNC
     if (!mpi_rank)
@@ -1088,8 +1089,10 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 #  endif // H5_ASYNC
 
 #  ifdef HAS_DAOS_VOL_EXT
-    if (indep_meta)
+    if (indep_meta) {
+      printf("Setting independent metadata\n");
       H5daos_set_all_ind_metadata_ops(file_plist_id, 1);
+    }
 #  endif
 
     hid_t file_id = H5Fcreate_wrap(fname, H5F_ACC_TRUNC, H5P_DEFAULT,
@@ -1103,20 +1106,70 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 #  endif
       sprintf(group_name, "/Timestep_%d", step);
 
-double t_group_create1 = MPI_Wtime();
+    double t_group_create1 = MPI_Wtime();
 
     hid_t group_id = H5Gcreate_wrap(file_id, group_name, H5P_DEFAULT,
                                     H5P_DEFAULT, H5P_DEFAULT, es_particle);
 
-double t_group_create2 = MPI_Wtime();
+    double t_group_create2 = MPI_Wtime();
     if (!rank)
       printf("Time for group create operation: %lf\n",
-      t_group_create2 - t_group_create1);
-
+             t_group_create2 - t_group_create1);
 
     // io_log("TimeHDF5Open:  " << uptime() - el1
     //  << " s"); // Easy to handle results for scripts
     // double el2 = uptime();
+
+    {
+      hid_t *part_group_ids = NULL;
+      size_t n_groups;
+      long long total_particles;
+
+      if (indep_meta) {
+        n_groups = numparticles;
+      } else {
+        MPI_Allreduce(&numparticles, &n_groups, 1, MPI_LONG_LONG, MPI_SUM,
+                      MPI_COMM_WORLD);
+      }
+
+      part_group_ids = (hid_t *) malloc(n_groups * sizeof(hid_t));
+
+      MPI_Barrier(MPI_COMM_WORLD);
+      if (rank == 0)
+        printf("Creating %zu groups\n", n_groups);
+      double t_group_create_part1 = MPI_Wtime();
+
+      if (indep_meta) {
+        for (long long i = 0; i < n_groups; i++) {
+          char part_group_name[64];
+          sprintf(part_group_name, "Part_%d", offset + i);
+
+          part_group_ids[i] =
+              H5Gcreate_wrap(group_id, part_group_name, H5P_DEFAULT,
+                             H5P_DEFAULT, H5P_DEFAULT, es_particle);
+        }
+      } else {
+        for (long long i = 0; i < n_groups; i++) {
+          char part_group_name[64];
+          sprintf(part_group_name, "Part_%d", i);
+
+          part_group_ids[i] =
+              H5Gcreate_wrap(group_id, part_group_name, H5P_DEFAULT,
+                             H5P_DEFAULT, H5P_DEFAULT, es_particle);
+        }
+      }
+      MPI_Barrier(MPI_COMM_WORLD);
+
+      double t_group_create_part2 = MPI_Wtime();
+      if (!rank)
+        printf("Time for part group create operation: %lf\n",
+               t_group_create_part2 - t_group_create_part1);
+
+      for (long long i = 0; i < n_groups; i++)
+        H5Gclose_wrap(part_group_ids[i], es_particle);
+      free(part_group_ids);
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
 
 #  ifdef HAS_PARTICLE_MAP
     hid_t map_id =
@@ -1174,8 +1227,8 @@ double t_group_create2 = MPI_Wtime();
     hsize_t memspace_start = 0, memspace_stride = 8, memspace_count = np_local;
     // H5Sselect_hyperslab(memspace, H5S_SELECT_SET, &memspace_start,
     //                     &memspace_stride, &memspace_count, NULL);
-    H5Sselect_hyperslab(memspace, H5S_SELECT_SET, &memspace_start,
-                        NULL, &memspace_count, NULL);
+    H5Sselect_hyperslab(memspace, H5S_SELECT_SET, &memspace_start, NULL,
+                        &memspace_count, NULL);
 #    endif // HAS_PARTICLE_COMP
 
     // MPI_Info_set(info, "romio_cb_write", "disable");
@@ -1184,6 +1237,8 @@ double t_group_create2 = MPI_Wtime();
     hid_t dset_id =
         H5Dcreate_wrap(group_id, "particle", particle_type_id, filespace,
                        H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT, es_particle);
+
+    double t_start = uptime();
 
     H5Dwrite_wrap(dset_id, particle_type_id, memspace, filespace, io_plist_id,
                   sp->p, es_particle);
@@ -1298,8 +1353,7 @@ double t_group_create2 = MPI_Wtime();
 
     if (!rank)
       printf("(%d) Total dump %s particles time for %lld particles: %lf\n",
-       step, sp->name,
-             sp->np, t_end - t_start);
+             step, sp->name, sp->np, t_end - t_start);
   }
 
   /**
