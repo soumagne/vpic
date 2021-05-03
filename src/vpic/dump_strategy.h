@@ -1124,6 +1124,7 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
       hid_t *part_group_ids = NULL;
       size_t n_groups;
       long long total_particles;
+      hid_t gcpl_id;
 
       if (indep_meta) {
         n_groups = numparticles;
@@ -1132,6 +1133,8 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
                       MPI_COMM_WORLD);
       }
 
+      gcpl_id = H5Pcreate(H5P_GROUP_CREATE);
+      H5daos_set_object_class(gcpl_id, "SX");
       part_group_ids = (hid_t *) malloc(n_groups * sizeof(hid_t));
 
       MPI_Barrier(MPI_COMM_WORLD);
@@ -1146,7 +1149,7 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 
           part_group_ids[i] =
               H5Gcreate_wrap(group_id, part_group_name, H5P_DEFAULT,
-                             H5P_DEFAULT, H5P_DEFAULT, es_particle);
+                             gcpl_id, H5P_DEFAULT, es_particle);
         }
       } else {
         for (long long i = 0; i < n_groups; i++) {
@@ -1155,10 +1158,11 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 
           part_group_ids[i] =
               H5Gcreate_wrap(group_id, part_group_name, H5P_DEFAULT,
-                             H5P_DEFAULT, H5P_DEFAULT, es_particle);
+                             gcpl_id, H5P_DEFAULT, es_particle);
         }
       }
       MPI_Barrier(MPI_COMM_WORLD);
+      H5Pclose(gcpl_id);
 
       double t_group_create_part2 = MPI_Wtime();
       if (!rank)
