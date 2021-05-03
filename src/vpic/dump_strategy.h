@@ -1090,7 +1090,6 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 
 #  ifdef HAS_DAOS_VOL_EXT
     if (indep_meta) {
-      printf("Setting independent metadata\n");
       H5daos_set_all_ind_metadata_ops(file_plist_id, 1);
     }
 #  endif
