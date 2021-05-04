@@ -281,6 +281,7 @@ private:
   hid_t hydro_type_id;
 #  endif
 #  ifdef HAS_PARTICLE_COMP
+  particle_t *part_buf;
   hid_t particle_type_id;
 #  endif
   hid_t es_field, es_hydro, es_particle;
@@ -1036,6 +1037,14 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
 
     int np_local = sp->np;
 
+    static double t_last_dump = 0;
+    if (t_last_dump != 0 && rank == 0) {
+      std::cout << "Compute time since last dump: " << MPI_Wtime() - t_last_dump
+                << std::endl;
+    }
+
+    double t_start = MPI_Wtime();
+
     // get the total number of particles. in this example, output only electrons
     // sp = species_list;
     if (strcmp(dump_dir, ".") == 0)
@@ -1211,10 +1220,40 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
         H5Dcreate_wrap(group_id, "particle", particle_type_id, filespace,
                        H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT, es_particle);
 
-    double t_start = uptime();
+    if (async) {
+      if (rank == 0)
+        std::cout << "About to wait" << std::endl;
+      asyncWait(es_field, H5ES_WAIT_FOREVER);
+      if (rank == 0)
+        std::cout << "Exiting wait" << std::endl;
+    }
+
+    static size_t part_buf_size = 0;
+
+    if (part_buf == NULL) {
+      part_buf_size = sizeof(particle_t) * numparticles;
+      part_buf = (particle_t *)malloc(part_buf_size);
+    } else {
+      size_t new_buf_size =  sizeof(particle_t) * numparticles;
+      if (new_buf_size > part_buf_size) {
+        part_buf = (particle_t *)realloc(field_buf, new_buf_size);
+        part_buf_size = new_buf_size;
+      }
+    }
+    memcpy(part_buf, sp->p, sizeof(particle_t) * numparticles);
+
+    double t_write1 = MPI_Wtime();
 
     H5Dwrite_wrap(dset_id, particle_type_id, memspace, filespace, io_plist_id,
-                  sp->p, es_particle);
+                  part_buf, es_particle);
+
+    double t_write2 = MPI_Wtime();
+    if (rank == 0)
+      std::cout << "-- part write time for "
+                << numparticles << " particles (total is "
+                << total_particles
+                << "): " << t_write2 - t_write1 << "s" << std::endl;
+
     H5Dclose_wrap(dset_id, es_particle);
 #    else // HAS_PARTICLE_COMP
     float *Pf = (float *)sp->p;
@@ -1317,16 +1356,17 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
     H5VLasync_finalize();
 #  endif // H5_ASYNC
 
-    if (async) {
-      asyncWait(es_particle, H5ES_WAIT_FOREVER);
-    }
+    // if (async) {
+    //   asyncWait(es_particle, H5ES_WAIT_FOREVER);
+    // }
 
     // io_log("TimeHDF5Close: " << uptime() - el3 << " s");
-    double t_end = uptime();
+    double t_end = MPI_Wtime();
 
     if (!rank)
       printf("(%d) Total dump %s particles time for %lld particles: %lf\n",
              step, sp->name, sp->np, t_end - t_start);
+    t_last_dump = MPI_Wtime();
   }
 
   /**

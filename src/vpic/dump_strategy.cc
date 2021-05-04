@@ -170,6 +170,7 @@ HDF5Dump::HDF5Dump(int _rank, int _nproc) : Dump_Strategy(_rank, _nproc) {
     hydro_type_id = H5Tcreate_hydro();
 #endif
 #ifdef HAS_PARTICLE_COMP
+    part_buf = NULL;
     particle_type_id = H5Tcreate_particle();
 #endif
     io_time = 0;
@@ -225,6 +226,7 @@ HDF5Dump::~HDF5Dump() {
     H5Tclose(hydro_type_id);
 #endif
 #ifdef HAS_PARTICLE_COMP
+    free(part_buf);
     H5Tclose(particle_type_id);
 #endif
 }
