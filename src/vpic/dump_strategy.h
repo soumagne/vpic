@@ -464,7 +464,14 @@ public:
     int mpi_size, mpi_rank;
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    double t_start = uptime();
+
+    static double t_last_dump = 0;
+    if (t_last_dump != 0 && rank == 0) {
+      std::cout << "Compute time since last dump: " << MPI_Wtime() - t_last_dump
+                << std::endl;
+    }
+
+    double t_start = MPI_Wtime();
 
 #  ifdef DUMP_INFO_DEBUG
     printf("MPI rank = %d, size = %d \n", mpi_rank, mpi_size);
@@ -689,11 +696,19 @@ public:
         std::cout << "Exiting wait" << std::endl;
     }
 
-    if (field_buf)
-      free(field_buf);
+    static size_t field_buf_size = 0;
 
-    field_buf = (field_t *)malloc(sizeof(field_t) * (grid->nx) * (grid->ny) *
-                                  (grid->nz));
+    if (field_buf == NULL) {
+      field_buf_size = sizeof(field_t) * (grid->nx) * (grid->ny) * (grid->nz);
+      field_buf = (field_t *)malloc(field_buf_size);
+    } else {
+      size_t new_buf_size =
+          sizeof(field_t) * (grid->nx) * (grid->ny) * (grid->nz);
+      if (new_buf_size > field_buf_size) {
+        field_buf = (field_t *)realloc(field_buf, new_buf_size);
+        field_buf_size = new_buf_size;
+      }
+    }
 
     for (int i(1); i < grid->nx + 1; i++) {
       for (int j(1); j < grid->ny + 1; j++) {
@@ -712,8 +727,10 @@ public:
     double t_write2 = MPI_Wtime();
     if (rank == 0)
       std::cout << "-- field write time for "
-                << (grid->nx) * (grid->ny) * (grid->nz)
-                << " fields: " << t_write2 - t_write1 << "s" << std::endl;
+                << (grid->nx) * (grid->ny) * (grid->nz) << " fields (total is "
+                << field_global_size[0] * field_global_size[1] *
+                       field_global_size[2]
+                << "): " << t_write2 - t_write1 << "s" << std::endl;
 
     H5Dclose_wrap(dset_id, es_field);
 #    else  // HAS_FIELD_COMP
@@ -982,10 +999,11 @@ H5D_MPIO_NOT_SIMPLE_OR_SCALAR_DATASPACES: "); break;
       field_tframe++;
     }
 #  endif // OUTPUT_XDMF
-    double t_end = uptime();
+    double t_end = MPI_Wtime();
     if (!rank)
       printf("Total dump field time for %d fields: %lf\n",
              (grid->nx) * (grid->ny) * (grid->nz), t_end - t_start);
+    t_last_dump = MPI_Wtime();
   }
   /**
    * @brief dump_particles to the HDF5 file
